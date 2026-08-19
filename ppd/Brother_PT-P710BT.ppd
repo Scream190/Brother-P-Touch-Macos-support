@@ -1,0 +1,105 @@
+*PPD-Adobe: "4.3"
+*%
+*% Brother PT-P710BT CUPS PPD (unofficial, community-written)
+*%
+*% Not affiliated with or endorsed by Brother Industries, Ltd. "Brother"
+*% and "P-touch" are trademarks of Brother Industries, Ltd. This PPD
+*% drives the printer via the rastertoptp710bt filter and the ptp710bt
+*% backend included in this project; see README.md for install/pairing
+*% instructions and known limitations.
+*%
+*FormatVersion: "4.3"
+*FileVersion: "1.0"
+*LanguageVersion: English
+*LanguageEncoding: ISO8859-1
+*PCFileName: "BRPTP710.PPD"
+*Manufacturer: "Brother"
+*Product: "(PT-P710BT)"
+*cupsVersion: 2.0
+*cupsSNMPSupplies: False
+*cupsLanguages: "en"
+*ModelName: "Brother PT-P710BT"
+*ShortNickName: "Brother PT-P710BT"
+*NickName: "Brother PT-P710BT, Bluetooth Raster (unofficial)"
+*PSVersion: "(3010.000) 0"
+*LanguageLevel: "3"
+*ColorDevice: False
+*DefaultColorSpace: Gray
+*FileSystem: False
+*Throughput: "1"
+*TTRasterizer: Type42
+*cupsManualCopies: True
+*cupsFilter2: "application/vnd.cups-raster application/vnd.brother-ptp710bt-raster 0 rastertoptp710bt"
+
+*OpenUI *PageSize/Tape Width: PickOne
+*OrderDependency: 10 AnySetup *PageSize
+*DefaultPageSize: mm12
+*PageSize mm3.5/3.5mm Tape: "<</PageSize[10 28]/ImagingBBox null>>setpagedevice"
+*PageSize mm6/6mm Tape: "<</PageSize[17 57]/ImagingBBox null>>setpagedevice"
+*PageSize mm9/9mm Tape: "<</PageSize[26 85]/ImagingBBox null>>setpagedevice"
+*PageSize mm12/12mm Tape: "<</PageSize[34 113]/ImagingBBox null>>setpagedevice"
+*PageSize mm18/18mm Tape: "<</PageSize[51 170]/ImagingBBox null>>setpagedevice"
+*PageSize mm24/24mm Tape: "<</PageSize[68 227]/ImagingBBox null>>setpagedevice"
+*CloseUI: *PageSize
+
+*OpenUI *PageRegion/Tape Width: PickOne
+*OrderDependency: 10 AnySetup *PageRegion
+*DefaultPageRegion: mm12
+*PageRegion mm3.5/3.5mm Tape: "<</PageSize[10 28]/ImagingBBox null>>setpagedevice"
+*PageRegion mm6/6mm Tape: "<</PageSize[17 57]/ImagingBBox null>>setpagedevice"
+*PageRegion mm9/9mm Tape: "<</PageSize[26 85]/ImagingBBox null>>setpagedevice"
+*PageRegion mm12/12mm Tape: "<</PageSize[34 113]/ImagingBBox null>>setpagedevice"
+*PageRegion mm18/18mm Tape: "<</PageSize[51 170]/ImagingBBox null>>setpagedevice"
+*PageRegion mm24/24mm Tape: "<</PageSize[68 227]/ImagingBBox null>>setpagedevice"
+*CloseUI: *PageRegion
+
+*DefaultImageableArea: mm12
+*ImageableArea mm3.5/3.5mm Tape: "0 0 10 28"
+*ImageableArea mm6/6mm Tape: "0 0 17 57"
+*ImageableArea mm9/9mm Tape: "0 0 26 85"
+*ImageableArea mm12/12mm Tape: "0 0 34 113"
+*ImageableArea mm18/18mm Tape: "0 0 51 170"
+*ImageableArea mm24/24mm Tape: "0 0 68 227"
+
+*DefaultPaperDimension: mm12
+*PaperDimension mm3.5/3.5mm Tape: "10 28"
+*PaperDimension mm6/6mm Tape: "17 57"
+*PaperDimension mm9/9mm Tape: "26 85"
+*PaperDimension mm12/12mm Tape: "34 113"
+*PaperDimension mm18/18mm Tape: "51 170"
+*PaperDimension mm24/24mm Tape: "68 227"
+
+*% Continuous tape has no fixed length: the widths/heights above are only
+*% convenient presets (~40mm default label length). For a different label
+*% length, use macOS's "Paper Size > Manage Custom Sizes..." and set the
+*% width to match your loaded tape (the filter picks the tape width from
+*% the actual page width in the print job, not from this preset's name).
+*MaxMediaWidth: "68"
+*MinMediaWidth: "10"
+*MaxMediaHeight: "5000"
+*MinMediaHeight: "20"
+*HWMargins: 0 0 0 0
+*CustomPageSize True: "<</PageSize[5 -2 roll]/ImagingBBox null>>setpagedevice"
+*ParamCustomPageSize Width: "1 points 10 68"
+*ParamCustomPageSize Height: "2 points 20 5000"
+*ParamCustomPageSize WidthOffset: "0 points 0 0"
+*ParamCustomPageSize HeightOffset: "0 points 0 0"
+*ParamCustomPageSize Orientation: "0 int 0 0"
+
+*OpenUI *AutoCut/Cut Each Label: Boolean
+*OrderDependency: 10 AnySetup *AutoCut
+*DefaultAutoCut: True
+*AutoCut True/Yes: ""
+*AutoCut False/No: ""
+*CloseUI: *AutoCut
+
+*DefaultResolution: 180dpi
+*Resolution 180dpi/180 DPI: "<</HWResolution[180 180]>>setpagedevice"
+
+*DefaultColorModel: Gray
+*ColorModel Gray/Black and White: "<</cupsColorSpace 0/cupsBitsPerColor 1/cupsColorOrder 0/cupsCompression 0>>setpagedevice"
+
+*cupsBitsPerColor: 1
+*cupsColorOrder: Chunky
+*cupsColorSpace: Gray
+*cupsCompression: 0

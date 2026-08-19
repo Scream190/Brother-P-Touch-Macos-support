@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+"""CUPS filter: CUPS Raster -> Brother PT-P710BT raster-mode command stream.
+
+Called by cupsd per the standard CUPS filter argv convention:
+
+    rastertoptp710bt job-id user title copies options [filename]
+
+Reads a CUPS Raster (application/vnd.cups-raster) job from ``filename`` or
+stdin, and writes the printer-ready Brother command bytes to stdout, where
+the ``ptp710bt`` backend (see ../backend/ptp710bt) picks them up and streams
+them to the printer over its paired Bluetooth serial connection.
+
+This filter sits at the END of the filter chain: the PPD's cupsFilter2 line
+tells CUPS to first turn the incoming job (PDF/PostScript/etc.) into CUPS
+Raster using CUPS's own bundled filters, and only then hand it to us. That
+keeps this file focused solely on the printer-specific raster-mode framing.
+"""
+import os
+import sys
+
+# install.sh copies the brother_ptraster package next to this script's
+# installed location (see install/install.sh); fall back to the repo layout
+# (../) so the filter also works uninstalled, straight out of a git checkout.
+_INSTALLED_LIB = "/usr/local/lib/brother_ptp710bt_driver"
+if os.path.isdir(os.path.join(_INSTALLED_LIB, "brother_ptraster")):
+    sys.path.insert(0, _INSTALLED_LIB)
+else:
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+
+from brother_ptraster.cups_raster import read_pages, RasterFormatError
+from brother_ptraster.media import DPI, nearest_media
+from brother_ptraster.protocol import RasterJobBuilder
+
+
+def log(level: str, message: str) -> None:
+    sys.stderr.write(f"{level}: [rastertoptp710bt] {message}\n")
+    sys.stderr.flush()
+
+
+def parse_options(options_str: str) -> dict:
+    """Parse CUPS's space-separated ``key=value`` option string.
+
+    CUPS quotes values containing spaces with single quotes, e.g.
+    ``media=mm12 title='My Label'``.
+    """
+    opts = {}
+    token = ""
+    in_quotes = False
+    tokens = []
+    for ch in options_str:
+        if ch == "'" :
+            in_quotes = not in_quotes
+            token += ch
+        elif ch == " " and not in_quotes:
+            if token:
+                tokens.append(token)
+            token = ""
+        else:
+            token += ch
+    if token:
+        tokens.append(token)
+
+    for tok in tokens:
+        if "=" in tok:
+            key, _, value = tok.partition("=")
+            opts[key] = value.strip("'")
+        else:
+            opts[tok] = "True"
+    return opts
+
+
+def main() -> int:
+    if len(sys.argv) not in (6, 7):
+        log("ERROR", f"usage: {sys.argv[0]} job-id user title copies options [file]")
+        return 1
+
+    _job_id, _user, _title, copies_str, options_str = sys.argv[1:6]
+    infile = sys.argv[6] if len(sys.argv) == 7 else None
+
+    try:
+        copies = max(1, int(copies_str))
+    except ValueError:
+        copies = 1
+
+    opts = parse_options(options_str)
+    auto_cut = opts.get("AutoCut", "True") != "False"
+
+    log("INFO", f"auto_cut={auto_cut} copies={copies}")
+
+    src = open(infile, "rb") if infile else sys.stdin.buffer
+    out = sys.stdout.buffer
+
+    try:
+        pages = list(read_pages(src))
+    except RasterFormatError as exc:
+        log("ERROR", f"failed to parse CUPS raster input: {exc}")
+        return 1
+    finally:
+        if infile:
+            src.close()
+
+    if not pages:
+        log("ERROR", "input contained no pages")
+        return 1
+
+    for copy in range(copies):
+        for page_num, page in enumerate(pages, start=1):
+            width_mm = page.width / DPI * 25.4
+            try:
+                media = nearest_media(width_mm)
+            except ValueError as exc:
+                log("ERROR", f"page {page_num}: {exc}")
+                return 1
+
+            builder = RasterJobBuilder(media, auto_cut=auto_cut)
+            for row in page.rows:
+                if len(row) >= media.print_bytes:
+                    line = row[: media.print_bytes]
+                else:
+                    line = row + b"\x00" * (media.print_bytes - len(row))
+                builder.add_line(line)
+            out.write(builder.build())
+            log(
+                "DEBUG",
+                f"copy {copy + 1}/{copies} page {page_num}/{len(pages)}: "
+                f"media={media.name} {len(page.rows)} lines",
+            )
+
+    out.flush()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
