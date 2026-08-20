@@ -31,57 +31,72 @@
 *cupsManualCopies: True
 *cupsFilter2: "application/vnd.cups-raster application/vnd.brother-ptp710bt-raster 0 rastertoptp710bt"
 
+*% PageSize/PageRegion/ImageableArea/PaperDimension are declared WIDE
+*% (length axis first, tape-width axis second) rather than narrow-tall
+*% (tape-width first). Real hardware test: with tape-width-first (the
+*% original layout here), cgpdftoraster's own auto-rotation heuristic for
+*% narrow/tall pages kicked in and rendered text sized for *vertical*
+*% reading (using the long axis as line-length) -- simply rotating that
+*% output back would need rescaling, not just a rotate/mirror, since the
+*% text was already sized assuming ~40mm of line length. Declaring the
+*% page wide up front avoids triggering that heuristic, so cgpdftoraster
+*% renders normal horizontal text sized for the tape-width axis as line
+*% height. The filter (rastertoptp710bt) reads tape width from cupsHEIGHT
+*% accordingly (see nearest_media() call there), and transposes the
+*% raster grid to match the printer's line-per-tape-width-scan format.
 *OpenUI *PageSize/Tape Width: PickOne
 *OrderDependency: 10 AnySetup *PageSize
 *DefaultPageSize: mm12
-*PageSize mm3.5/3.5mm Tape: "<</PageSize[10 28]/ImagingBBox null>>setpagedevice"
-*PageSize mm6/6mm Tape: "<</PageSize[17 57]/ImagingBBox null>>setpagedevice"
-*PageSize mm9/9mm Tape: "<</PageSize[26 85]/ImagingBBox null>>setpagedevice"
-*PageSize mm12/12mm Tape: "<</PageSize[34 113]/ImagingBBox null>>setpagedevice"
-*PageSize mm18/18mm Tape: "<</PageSize[51 170]/ImagingBBox null>>setpagedevice"
-*PageSize mm24/24mm Tape: "<</PageSize[68 227]/ImagingBBox null>>setpagedevice"
+*PageSize mm3.5/3.5mm Tape: "<</PageSize[28 10]/ImagingBBox null>>setpagedevice"
+*PageSize mm6/6mm Tape: "<</PageSize[57 17]/ImagingBBox null>>setpagedevice"
+*PageSize mm9/9mm Tape: "<</PageSize[85 26]/ImagingBBox null>>setpagedevice"
+*PageSize mm12/12mm Tape: "<</PageSize[113 34]/ImagingBBox null>>setpagedevice"
+*PageSize mm18/18mm Tape: "<</PageSize[170 51]/ImagingBBox null>>setpagedevice"
+*PageSize mm24/24mm Tape: "<</PageSize[227 68]/ImagingBBox null>>setpagedevice"
 *CloseUI: *PageSize
 
 *OpenUI *PageRegion/Tape Width: PickOne
 *OrderDependency: 10 AnySetup *PageRegion
 *DefaultPageRegion: mm12
-*PageRegion mm3.5/3.5mm Tape: "<</PageSize[10 28]/ImagingBBox null>>setpagedevice"
-*PageRegion mm6/6mm Tape: "<</PageSize[17 57]/ImagingBBox null>>setpagedevice"
-*PageRegion mm9/9mm Tape: "<</PageSize[26 85]/ImagingBBox null>>setpagedevice"
-*PageRegion mm12/12mm Tape: "<</PageSize[34 113]/ImagingBBox null>>setpagedevice"
-*PageRegion mm18/18mm Tape: "<</PageSize[51 170]/ImagingBBox null>>setpagedevice"
-*PageRegion mm24/24mm Tape: "<</PageSize[68 227]/ImagingBBox null>>setpagedevice"
+*PageRegion mm3.5/3.5mm Tape: "<</PageSize[28 10]/ImagingBBox null>>setpagedevice"
+*PageRegion mm6/6mm Tape: "<</PageSize[57 17]/ImagingBBox null>>setpagedevice"
+*PageRegion mm9/9mm Tape: "<</PageSize[85 26]/ImagingBBox null>>setpagedevice"
+*PageRegion mm12/12mm Tape: "<</PageSize[113 34]/ImagingBBox null>>setpagedevice"
+*PageRegion mm18/18mm Tape: "<</PageSize[170 51]/ImagingBBox null>>setpagedevice"
+*PageRegion mm24/24mm Tape: "<</PageSize[227 68]/ImagingBBox null>>setpagedevice"
 *CloseUI: *PageRegion
 
 *DefaultImageableArea: mm12
-*ImageableArea mm3.5/3.5mm Tape: "0 0 10 28"
-*ImageableArea mm6/6mm Tape: "0 0 17 57"
-*ImageableArea mm9/9mm Tape: "0 0 26 85"
-*ImageableArea mm12/12mm Tape: "0 0 34 113"
-*ImageableArea mm18/18mm Tape: "0 0 51 170"
-*ImageableArea mm24/24mm Tape: "0 0 68 227"
+*ImageableArea mm3.5/3.5mm Tape: "0 0 28 10"
+*ImageableArea mm6/6mm Tape: "0 0 57 17"
+*ImageableArea mm9/9mm Tape: "0 0 85 26"
+*ImageableArea mm12/12mm Tape: "0 0 113 34"
+*ImageableArea mm18/18mm Tape: "0 0 170 51"
+*ImageableArea mm24/24mm Tape: "0 0 227 68"
 
 *DefaultPaperDimension: mm12
-*PaperDimension mm3.5/3.5mm Tape: "10 28"
-*PaperDimension mm6/6mm Tape: "17 57"
-*PaperDimension mm9/9mm Tape: "26 85"
-*PaperDimension mm12/12mm Tape: "34 113"
-*PaperDimension mm18/18mm Tape: "51 170"
-*PaperDimension mm24/24mm Tape: "68 227"
+*PaperDimension mm3.5/3.5mm Tape: "28 10"
+*PaperDimension mm6/6mm Tape: "57 17"
+*PaperDimension mm9/9mm Tape: "85 26"
+*PaperDimension mm12/12mm Tape: "113 34"
+*PaperDimension mm18/18mm Tape: "170 51"
+*PaperDimension mm24/24mm Tape: "227 68"
 
-*% Continuous tape has no fixed length: the widths/heights above are only
+*% Continuous tape has no fixed length: the dimensions above are only
 *% convenient presets (~40mm default label length). For a different label
 *% length, use macOS's "Paper Size > Manage Custom Sizes..." and set the
-*% width to match your loaded tape (the filter picks the tape width from
-*% the actual page width in the print job, not from this preset's name).
-*MaxMediaWidth: "68"
-*MinMediaWidth: "10"
-*MaxMediaHeight: "5000"
-*MinMediaHeight: "20"
+*% HEIGHT to match your loaded tape width (this PPD declares pages wide:
+*% Width = label length, Height = tape width -- the filter picks the tape
+*% width from the actual page height in the print job, not this preset's
+*% name).
+*MaxMediaWidth: "5000"
+*MinMediaWidth: "20"
+*MaxMediaHeight: "68"
+*MinMediaHeight: "10"
 *HWMargins: 0 0 0 0
 *CustomPageSize True: "<</PageSize[5 -2 roll]/ImagingBBox null>>setpagedevice"
-*ParamCustomPageSize Width: "1 points 10 68"
-*ParamCustomPageSize Height: "2 points 20 5000"
+*ParamCustomPageSize Width: "1 points 20 5000"
+*ParamCustomPageSize Height: "2 points 10 68"
 *ParamCustomPageSize WidthOffset: "0 points 0 0"
 *ParamCustomPageSize HeightOffset: "0 points 0 0"
 *ParamCustomPageSize Orientation: "0 int 0 0"
