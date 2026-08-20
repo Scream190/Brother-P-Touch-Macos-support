@@ -59,14 +59,43 @@ class RasterPage:
 
 
 def _read_exact(f: BinaryIO, n: int) -> bytes:
-    data = f.read(n)
-    if len(data) != n:
-        raise RasterFormatError(f"unexpected EOF: wanted {n} bytes, got {len(data)}")
+    """Read exactly ``n`` bytes, looping over short reads.
+
+    ``f.read(n)`` only reliably returns exactly ``n`` bytes for regular
+    files. For a pipe -- which is what stdin actually is when cupsd runs
+    filters as a live pipeline, as opposed to a filter run by hand against
+    a regular file -- a single read() call can return fewer bytes even
+    when more are still coming, and a naive single-shot read wrongly
+    treats that as EOF/corruption.
+    """
+    data = _read_full_or_none(f, n)
+    if data is None or len(data) != n:
+        got = 0 if data is None else len(data)
+        raise RasterFormatError(f"unexpected EOF: wanted {n} bytes, got {got}")
     return data
 
 
+def _read_full_or_none(f: BinaryIO, n: int):
+    """Like _read_exact, but returns None (instead of raising) if the
+    stream ends before any bytes are read at all -- i.e. a legitimate
+    "nothing more to read" EOF at a boundary where that's expected (start
+    of stream, between pages), as opposed to ending partway through.
+    """
+    chunks = []
+    remaining = n
+    while remaining > 0:
+        chunk = f.read(remaining)
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    if not chunks:
+        return None
+    return b"".join(chunks)
+
+
 def read_pages(f: BinaryIO) -> Iterator[RasterPage]:
-    sync = f.read(4)
+    sync = _read_full_or_none(f, 4)
     if sync not in SYNC_WORDS:
         raise RasterFormatError(f"not a CUPS raster stream (bad sync word {sync!r})")
 
@@ -78,8 +107,8 @@ def read_pages(f: BinaryIO) -> Iterator[RasterPage]:
             pass
         first = False
 
-        header_bytes = f.read(_HEADER_SIZE)
-        if not header_bytes:
+        header_bytes = _read_full_or_none(f, _HEADER_SIZE)
+        if header_bytes is None:
             return  # clean EOF between pages
         if len(header_bytes) != _HEADER_SIZE:
             raise RasterFormatError("truncated page header")

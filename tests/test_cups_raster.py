@@ -50,6 +50,43 @@ def test_read_single_uncompressed_page():
     assert page.rows == rows
 
 
+class _ChunkyPipe:
+    """A file-like object that hands back at most 1 byte per read() call,
+    like a real OS pipe can, to catch code that assumes a single read()
+    returns everything requested. This reproduces the real-world failure:
+    cupsd pipes filter stdout/stdin together as live pipes between
+    concurrently-running processes, unlike a filter run by hand against a
+    regular (buffered, single-read-satisfies-everything) file.
+    """
+
+    def __init__(self, data: bytes):
+        self._data = data
+        self._pos = 0
+
+    def read(self, n):
+        if self._pos >= len(self._data):
+            return b""
+        chunk = self._data[self._pos : self._pos + 1]
+        self._pos += len(chunk)
+        return chunk
+
+
+def test_read_pages_handles_short_reads_from_a_pipe():
+    width, height, bpl = 128, 2, 16
+    rows = [bytes([0xAA]) * bpl, bytes([0x55]) * bpl]
+
+    stream = io.BytesIO()
+    stream.write(b"RaS2")
+    stream.write(_make_page_header(width, height, bpl))
+    for row in rows:
+        stream.write(row)
+
+    pipe = _ChunkyPipe(stream.getvalue())
+    pages = list(read_pages(pipe))
+    assert len(pages) == 1
+    assert pages[0].rows == rows
+
+
 def test_read_rejects_bad_sync_word():
     stream = io.BytesIO(b"NOPE" + b"\x00" * _HEADER_SIZE)
     try:
