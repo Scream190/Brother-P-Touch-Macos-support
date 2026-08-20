@@ -93,11 +93,17 @@
 *AutoCut False/No: ""
 *CloseUI: *AutoCut
 
+*OpenUI *Resolution/Resolution: PickOne
+*OrderDependency: 10 AnySetup *Resolution
 *DefaultResolution: 180dpi
 *Resolution 180dpi/180 DPI: "<</HWResolution[180 180]>>setpagedevice"
+*CloseUI: *Resolution
 
+*OpenUI *ColorModel/Color Mode: PickOne
+*OrderDependency: 10 AnySetup *ColorModel
 *DefaultColorModel: Gray
 *ColorModel Gray/Black and White: "<</cupsColorSpace 0/cupsBitsPerColor 1/cupsColorOrder 0/cupsCompression 0>>setpagedevice"
+*CloseUI: *ColorModel
 
 *cupsBitsPerColor: 1
 *cupsColorOrder: Chunky

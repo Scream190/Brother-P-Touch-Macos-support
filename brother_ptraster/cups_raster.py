@@ -1,16 +1,19 @@
 """Minimal reader for the CUPS Raster page-stream format.
 
 Only the subset needed by this driver is implemented: 1-bit-per-pixel,
-uncompressed rows, version 2/3 sync words. This is the format CUPS's own
-``pdftoraster``/``pstoraster``/``rastertopwg`` filters emit by default when
-the PPD declares a 1-bit ``ColorModel`` (as ``ppd/Brother_PT-P710BT.ppd``
-does), so it covers the print path this driver actually uses.
-
-Format reference: the CUPS Raster page-header layout is a stable, publicly
-documented C struct (``cups_page_header2_t`` in ``cups/raster.h``). Field
-offsets/sizes below mirror that struct. If a future cups-filters version
-changes the on-disk layout, ``read_pages`` will raise ``RasterFormatError``
-rather than silently mis-parsing.
+uncompressed rows, RaS2/RaS3 sync words (the ones cups-filters' own
+pdftoraster/pstoraster/rastertopwg emit by default). Field layout is
+transcribed verbatim from ``cups_page_header2_t`` in Apple/OpenPrinting
+CUPS's ``cups/raster.h``, field by field with explicit names, rather than
+hand-counted repeat groups -- an earlier version of this file used
+``"I" * n`` groups sized from a written-out description of the struct and
+got the total header length wrong (it stopped at ``cupsRowStep`` and
+omitted the entire "Version 2 Dictionary Values" tail --
+cupsNumColors..cupsPageSizeName), which both RaS2 and RaS3 streams
+actually include on the wire. That silently misaligned every read after
+the header, confirmed via a real print job on hardware
+(``cupsBitsPerPixel`` came back 0 instead of 1). Explicit per-field names
+make that class of bug structurally harder to reintroduce.
 """
 
 from __future__ import annotations
@@ -21,28 +24,42 @@ from typing import BinaryIO, Iterator, List
 
 SYNC_WORDS = {b"RaS2", b"RaS3", b"2SaR", b"3SaR"}  # last two: byte-swapped variant
 
-# cups_page_header2_t (relevant prefix): 4-byte sync handled separately, then
-#   char MediaClass[64], MediaColor[64], MediaType[64], OutputType[64]      (256)
-#   unsigned AdvanceDistance, AdvanceMedia, Collate                         (12)
-#   unsigned CutMedia, Duplex                                               (8)
-#   unsigned HWResolution[2]                                                (8)
-#   unsigned ImagingBoundingBox[4]                                         (16)
-#   unsigned InsertSheet, Jog, LeadingEdge                                 (12)
-#   unsigned Margins[2]                                                     (8)
-#   unsigned ManualFeed                                                     (4)
-#   unsigned MediaPosition, MediaWeight                                     (8)
-#   unsigned MirrorPrint, NegativePrint, NumCopies, Orientation             (16)
-#   unsigned OutputFaceUp                                                   (4)
-#   unsigned PageSize[2]                                                    (8)
-#   unsigned Separations, TraySwitch, Tumble                               (12)
-#   unsigned cupsWidth, cupsHeight                                          (8)
-#   unsigned cupsMediaType                                                  (4)
-#   unsigned cupsBitsPerColor, cupsBitsPerPixel, cupsBytesPerLine           (12)
-#   unsigned cupsColorOrder, cupsColorSpace                                 (8)
-#   unsigned cupsCompression, cupsRowCount, cupsRowFeed, cupsRowStep        (16)
-# (further v2/v3 fields follow but aren't needed here)
-_HEADER_FMT = "<" + "64s" * 4 + "I" * 3 + "I" * 2 + "I" * 2 + "I" * 4 + "I" * 3 + "I" * 2 + "I" + "I" * 2 + "I" * 4 + "I" + "I" * 2 + "I" * 3 + "I" * 2 + "I" + "I" * 3 + "I" * 2 + "I" * 4
+# Verbatim field order from cups_page_header2_t (cups/raster.h). Every
+# member is listed explicitly, with array members expanded into one named
+# entry per element (except the two pure-string blobs, cupsString and the
+# four MediaClass-style char[64] fields, which are read as a single bytes
+# object each since we never need to inspect their contents).
+_FIELDS = (
+    [
+        ("MediaClass", "64s"), ("MediaColor", "64s"), ("MediaType", "64s"), ("OutputType", "64s"),
+        ("AdvanceDistance", "I"), ("AdvanceMedia", "I"), ("Collate", "I"), ("CutMedia", "I"), ("Duplex", "I"),
+        ("HWResolution0", "I"), ("HWResolution1", "I"),
+        ("ImagingBoundingBox0", "I"), ("ImagingBoundingBox1", "I"),
+        ("ImagingBoundingBox2", "I"), ("ImagingBoundingBox3", "I"),
+        ("InsertSheet", "I"), ("Jog", "I"), ("LeadingEdge", "I"),
+        ("Margins0", "I"), ("Margins1", "I"),
+        ("ManualFeed", "I"), ("MediaPosition", "I"), ("MediaWeight", "I"),
+        ("MirrorPrint", "I"), ("NegativePrint", "I"), ("NumCopies", "I"), ("Orientation", "I"), ("OutputFaceUp", "I"),
+        ("PageSize0", "I"), ("PageSize1", "I"),
+        ("Separations", "I"), ("TraySwitch", "I"), ("Tumble", "I"),
+        ("cupsWidth", "I"), ("cupsHeight", "I"), ("cupsMediaType", "I"),
+        ("cupsBitsPerColor", "I"), ("cupsBitsPerPixel", "I"), ("cupsBytesPerLine", "I"),
+        ("cupsColorOrder", "I"), ("cupsColorSpace", "I"),
+        ("cupsCompression", "I"), ("cupsRowCount", "I"), ("cupsRowFeed", "I"), ("cupsRowStep", "I"),
+        ("cupsNumColors", "I"),
+        ("cupsBorderlessScalingFactor", "f"),
+        ("cupsPageSize0", "f"), ("cupsPageSize1", "f"),
+        ("cupsImagingBBox0", "f"), ("cupsImagingBBox1", "f"), ("cupsImagingBBox2", "f"), ("cupsImagingBBox3", "f"),
+    ]
+    + [(f"cupsInteger{i}", "I") for i in range(16)]
+    + [(f"cupsReal{i}", "f") for i in range(16)]
+    + [("cupsString", "1024s")]
+    + [("cupsMarkerType", "64s"), ("cupsRenderingIntent", "64s"), ("cupsPageSizeName", "64s")]
+)
+
+_HEADER_FMT = "<" + "".join(tok for _name, tok in _FIELDS)
 _HEADER_SIZE = struct.calcsize(_HEADER_FMT)
+_FIELD_NAMES = [name for name, _tok in _FIELDS]
 
 
 class RasterFormatError(Exception):
@@ -55,6 +72,12 @@ class RasterPage:
     height: int
     bits_per_pixel: int
     bytes_per_line: int
+    hw_resolution: tuple  # (dpi_x, dpi_y), as actually used by the upstream
+                           # rasterizer -- don't assume a fixed DPI (e.g. a
+                           # PPD default not taking effect can silently
+                           # change this; real hardware test saw 100dpi
+                           # despite the PPD declaring 180dpi as the only
+                           # option).
     rows: List[bytes]
 
 
@@ -99,31 +122,22 @@ def read_pages(f: BinaryIO) -> Iterator[RasterPage]:
     if sync not in SYNC_WORDS:
         raise RasterFormatError(f"not a CUPS raster stream (bad sync word {sync!r})")
 
-    first = True
     while True:
-        if not first:
-            # Only the very first page is preceded by the file-level sync
-            # word; subsequent pages' headers follow immediately.
-            pass
-        first = False
-
         header_bytes = _read_full_or_none(f, _HEADER_SIZE)
         if header_bytes is None:
             return  # clean EOF between pages
         if len(header_bytes) != _HEADER_SIZE:
             raise RasterFormatError("truncated page header")
 
-        fields = struct.unpack(_HEADER_FMT, header_bytes)
-        # Field order per the struct layout comment above. The last 12
-        # unsigned-int fields are, in order: cupsWidth, cupsHeight,
-        # cupsMediaType, cupsBitsPerColor, cupsBitsPerPixel,
-        # cupsBytesPerLine, cupsColorOrder, cupsColorSpace,
-        # cupsCompression, cupsRowCount, cupsRowFeed, cupsRowStep.
-        cups_width = fields[-12]
-        cups_height = fields[-11]
-        cups_bits_per_pixel = fields[-8]
-        cups_bytes_per_line = fields[-7]
-        cups_compression = fields[-4]
+        values = struct.unpack(_HEADER_FMT, header_bytes)
+        header = dict(zip(_FIELD_NAMES, values))
+
+        cups_width = header["cupsWidth"]
+        cups_height = header["cupsHeight"]
+        cups_bits_per_pixel = header["cupsBitsPerPixel"]
+        cups_bytes_per_line = header["cupsBytesPerLine"]
+        cups_compression = header["cupsCompression"]
+        hw_resolution = (header["HWResolution0"], header["HWResolution1"])
 
         if cups_compression:
             raise RasterFormatError(
@@ -141,5 +155,6 @@ def read_pages(f: BinaryIO) -> Iterator[RasterPage]:
             height=cups_height,
             bits_per_pixel=cups_bits_per_pixel,
             bytes_per_line=cups_bytes_per_line,
+            hw_resolution=hw_resolution,
             rows=rows,
         )

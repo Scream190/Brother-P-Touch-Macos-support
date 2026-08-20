@@ -113,7 +113,26 @@ def main() -> int:
 
     for copy in range(copies):
         for page_num, page in enumerate(pages, start=1):
-            width_mm = page.width / DPI * 25.4
+            # Use the resolution the rasterizer actually used, not an
+            # assumed constant: real hardware test found cgpdftoraster
+            # used 100dpi despite the PPD declaring 180dpi as the only
+            # resolution (a missing *OpenUI/*CloseUI wrapper around
+            # *Resolution meant CUPS wasn't recognizing it as a real
+            # option). We only know how to send raster data dot-for-dot to
+            # the printer's fixed 180dpi head, so if the actual resolution
+            # doesn't match, the safe thing is to refuse rather than print
+            # at the wrong physical size.
+            dpi_x, dpi_y = page.hw_resolution
+            if dpi_x != DPI or dpi_y != DPI:
+                log(
+                    "ERROR",
+                    f"page {page_num}: job was rasterized at {dpi_x}x{dpi_y}dpi, "
+                    f"but this driver only supports {DPI}dpi (the printer's native "
+                    f"resolution) -- check the PPD's Resolution option/CUPS config",
+                )
+                return 1
+
+            width_mm = page.width / dpi_x * 25.4
             try:
                 media = nearest_media(width_mm)
             except ValueError as exc:
