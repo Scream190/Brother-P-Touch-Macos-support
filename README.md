@@ -88,8 +88,12 @@ sudo ./install/install.sh
 ```
 
 This copies:
-- `brother_ptraster/` to `/usr/local/lib/brother_ptp710bt_driver/`
 - `filter/rastertoptp710bt` to `/usr/libexec/cups/filter/`
+- `brother_ptraster/` to `/usr/libexec/cups/filter/brother_ptraster/` (the
+  filter's Python dependency, vendored right next to it rather than under
+  `/usr/local` -- real hardware test found cupsd runs filters under a
+  filesystem sandbox that raised `ModuleNotFoundError` trying to read
+  `/usr/local/lib`, even running as root)
 - `backend/ptp710bt` to `/usr/libexec/cups/backend/` (only needed if you
   end up using the experimental Bluetooth path)
 - `ppd/Brother_PT-P710BT.ppd` to `/Library/Printers/PPDs/Contents/Resources/`
@@ -249,8 +253,8 @@ python3 -m pytest tests/ -v
 
 The filter and backend also run fine straight from a git checkout (without
 `install.sh`) for local testing — they fall back to importing
-`brother_ptraster` via a relative path when the installed copy under
-`/usr/local/lib/brother_ptp710bt_driver` isn't present.
+`brother_ptraster` via a relative path when there's no sibling
+`brother_ptraster/` directory next to the installed filter script.
 
 If you have `cupstestppd` (ships with CUPS), sanity-check the PPD:
 ```sh

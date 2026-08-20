@@ -10,10 +10,14 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-LIB_DIR=/usr/local/lib/brother_ptp710bt_driver
 FILTER=/usr/libexec/cups/filter/rastertoptp710bt
+FILTER_LIB=/usr/libexec/cups/filter/brother_ptraster
 BACKEND=/usr/libexec/cups/backend/ptp710bt
 PPD=/Library/Printers/PPDs/Contents/Resources/Brother_PT-P710BT.ppd
+# Older installs (before the library moved out of /usr/local due to
+# cupsd's filter sandbox not allowing it) may still have this; clean it up
+# too if present.
+OLD_LIB_DIR=/usr/local/lib/brother_ptp710bt_driver
 
 echo "==> Removing any print queues using this driver"
 # Match by installed PPD (works for both the usb:// and ptp710bt:// device
@@ -29,7 +33,7 @@ fi
 
 echo "==> Removing driver files"
 rm -f "$FILTER" "$BACKEND" "$PPD"
-rm -rf "$LIB_DIR"
+rm -rf "$FILTER_LIB" "$OLD_LIB_DIR"
 
 echo "==> Restarting cupsd"
 launchctl kickstart -k system/org.cups.cupsd

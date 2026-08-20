@@ -15,6 +15,15 @@
 # volume, and this driver doesn't need to touch it (it registers its filter
 # via the PPD's cupsFilter2 line, not via /usr/share/cups/mime.*).
 #
+# The brother_ptraster Python library is vendored directly into
+# /usr/libexec/cups/filter/ (next to the filter script) rather than under
+# /usr/local: real hardware test found cupsd's filter processes run under a
+# filesystem sandbox that raised ModuleNotFoundError trying to read
+# /usr/local/lib, even running as root with correct permissions. The filter
+# directory itself is provably readable (cupsd already executes the filter
+# script from there), so that's where its Python dependencies need to live
+# too.
+#
 # Usage:
 #   sudo ./install/install.sh
 #
@@ -36,21 +45,19 @@ fi
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-LIB_DIR=/usr/local/lib/brother_ptp710bt_driver
 FILTER_DIR=/usr/libexec/cups/filter
 BACKEND_DIR=/usr/libexec/cups/backend
 PPD_DIR=/Library/Printers/PPDs/Contents/Resources
 
-echo "==> Installing brother_ptraster library to $LIB_DIR"
-mkdir -p "$LIB_DIR"
-rm -rf "$LIB_DIR/brother_ptraster"
-cp -R "$REPO_DIR/brother_ptraster" "$LIB_DIR/brother_ptraster"
-chown -R root:wheel "$LIB_DIR"
-find "$LIB_DIR" -type f -name '*.py' -exec chmod 644 {} \;
-find "$LIB_DIR" -type d -exec chmod 755 {} \;
-
 echo "==> Installing CUPS filter to $FILTER_DIR/rastertoptp710bt"
 install -o root -g wheel -m 755 "$REPO_DIR/filter/rastertoptp710bt" "$FILTER_DIR/rastertoptp710bt"
+
+echo "==> Installing brother_ptraster library to $FILTER_DIR/brother_ptraster"
+rm -rf "$FILTER_DIR/brother_ptraster"
+cp -R "$REPO_DIR/brother_ptraster" "$FILTER_DIR/brother_ptraster"
+chown -R root:wheel "$FILTER_DIR/brother_ptraster"
+find "$FILTER_DIR/brother_ptraster" -type f -name '*.py' -exec chmod 644 {} \;
+find "$FILTER_DIR/brother_ptraster" -type d -exec chmod 755 {} \;
 
 echo "==> Installing CUPS backend to $BACKEND_DIR/ptp710bt"
 install -o root -g wheel -m 755 "$REPO_DIR/backend/ptp710bt" "$BACKEND_DIR/ptp710bt"

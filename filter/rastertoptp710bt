@@ -18,14 +18,22 @@ keeps this file focused solely on the printer-specific raster-mode framing.
 import os
 import sys
 
-# install.sh copies the brother_ptraster package next to this script's
-# installed location (see install/install.sh); fall back to the repo layout
-# (../) so the filter also works uninstalled, straight out of a git checkout.
-_INSTALLED_LIB = "/usr/local/lib/brother_ptp710bt_driver"
-if os.path.isdir(os.path.join(_INSTALLED_LIB, "brother_ptraster")):
-    sys.path.insert(0, _INSTALLED_LIB)
+# install.sh vendors a copy of the brother_ptraster package directly next
+# to this script (see install/install.sh) rather than under /usr/local:
+# cupsd runs filters under a restricted filesystem sandbox on modern macOS
+# that does not appear to allow reading /usr/local, even as root -- real
+# hardware test showed "ModuleNotFoundError: No module named
+# 'brother_ptraster'" despite the directory demonstrably existing there
+# with correct permissions. /usr/libexec/cups/filter is provably readable
+# (cupsd is already executing this very script from inside it), so that's
+# where the package needs to live for the installed case. Falls back to
+# the repo layout (../) so this also works uninstalled, straight out of a
+# git checkout.
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+if os.path.isdir(os.path.join(_THIS_DIR, "brother_ptraster")):
+    sys.path.insert(0, _THIS_DIR)
 else:
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+    sys.path.insert(0, os.path.join(_THIS_DIR, ".."))
 
 from brother_ptraster.cups_raster import read_pages, RasterFormatError
 from brother_ptraster.media import DPI, nearest_media
