@@ -73,7 +73,7 @@ class RasterJobBuilder:
         trailing_invalidate: bool = False,
         mode_byte: "int | None" = None,
         advanced_byte: "int | None" = None,
-        leading_cleanup: bool = True,
+        leading_cleanup: bool = False,
     ):
         self.media = media
         self.auto_cut = auto_cut
@@ -113,13 +113,19 @@ class RasterJobBuilder:
         # This sets the trailing feed (in dots) applied before the final
         # cut so the printed content actually clears the cutter and ejects.
         self.feed_margin_dots = round(feed_margin_mm / 25.4 * DPI)
-        # User-requested (real hardware use): every job starts with its own
+        # DEFAULT OFF -- confirmed on real hardware to hang the printer/USB
+        # connection (needed a full Mac restart to recover; power-cycling
+        # the printer and replugging the cable alone did not clear it).
+        # The intent (user-requested) was: every job starts with its own
         # tiny feed+cut cycle first (0 raster lines, so it's just the
         # control-command overhead -- feed the margin, then cut), so each
         # label always starts on a freshly-cut, consistent tape edge
-        # regardless of whatever came before. Independent of the
-        # auto_cut/advanced-byte fix for cutting at the END of a job; this
-        # is a deliberate extra segment prepended to every transmission.
+        # regardless of whatever came before. A same-transmission "0-line
+        # job segment followed immediately by the real job segment" is not
+        # a safe way to get that -- do not re-enable this without a
+        # different implementation and very cautious, incremental hardware
+        # testing (confirm a plain single-segment job still works on a
+        # freshly rebooted machine before trying this again).
         self.leading_cleanup = leading_cleanup
         self._lines: List[bytes] = []
 

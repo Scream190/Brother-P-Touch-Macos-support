@@ -180,7 +180,7 @@ def main() -> int:
     parser.add_argument("--feed-margin-mm", type=float, default=25.0, help="trailing feed before the cut, in mm (default 25; raise this if the printed area doesn't fully eject/get cut)")
     parser.add_argument("--invert", action="store_true", help="flip pixel polarity (try this if feed/cut work but nothing visibly prints)")
     parser.add_argument("--trailing-invalidate", action="store_true", help="append a second Invalidate+Initialize after the job (try this if the printer only cuts when the NEXT job starts, not at the end of the current one)")
-    parser.add_argument("--no-leading-cleanup", action="store_true", help="skip the leading 0-line feed+cut segment that normally starts every job (on by default so each label starts on a freshly-cut edge)")
+    parser.add_argument("--leading-cleanup", action="store_true", help="DANGER: confirmed on real hardware to hang the printer/USB connection, requiring a full Mac restart to recover. Off by default; only pass this for careful, incremental re-testing of that specific bug, expecting to need a restart afterward.")
     parser.add_argument("--mode-byte", type=lambda s: int(s, 0), default=None, help="raw override for the 'various mode settings' (ESC i M) byte, e.g. 0x40 or 0x48 -- bypasses --no-cut")
     parser.add_argument("--advanced-byte", type=lambda s: int(s, 0), default=None, help="raw override for the 'advanced mode settings' (ESC i K) byte, e.g. 0x08 -- for testing candidate 'no chain printing' bits")
     parser.add_argument("--usb-uri", help="USB device URI from 'sudo lpinfo -v', e.g. usb://Brother/PT-P710BT?serial=XXXX (recommended transport; needs sudo)")
@@ -202,7 +202,7 @@ def main() -> int:
         trailing_invalidate=args.trailing_invalidate,
         mode_byte=args.mode_byte,
         advanced_byte=args.advanced_byte,
-        leading_cleanup=not args.no_leading_cleanup,
+        leading_cleanup=args.leading_cleanup,
     )
     builder.add_lines(lines)
     data = builder.build()

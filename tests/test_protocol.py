@@ -86,9 +86,16 @@ def test_job_ends_with_print_and_feed():
     assert data[-1:] == b"\x1a"
 
 
-def test_leading_cleanup_defaults_on_and_prepends_a_zero_line_segment():
+def test_leading_cleanup_defaults_off():
+    # Confirmed on real hardware to hang the printer/USB connection (see
+    # __init__ for details) -- must default to False.
     media = get_media("12mm")
-    with_cleanup = RasterJobBuilder(media)
+    assert RasterJobBuilder(media).leading_cleanup is False
+
+
+def test_leading_cleanup_prepends_a_zero_line_segment_when_enabled():
+    media = get_media("12mm")
+    with_cleanup = RasterJobBuilder(media, leading_cleanup=True)
     with_cleanup.add_line(b"\x00" * media.print_bytes)
     with_data = with_cleanup.build()
 
