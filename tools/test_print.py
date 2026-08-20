@@ -157,6 +157,7 @@ def main() -> int:
     parser.add_argument("--pattern", choices=PATTERNS, default="ruler", help="test pattern to print")
     parser.add_argument("--length", type=int, default=200, help="label length in dots (180 dots ~= 25.4mm at 180dpi)")
     parser.add_argument("--no-cut", action="store_true", help="disable auto-cut after printing")
+    parser.add_argument("--invert", action="store_true", help="flip pixel polarity (try this if feed/cut work but nothing visibly prints)")
     parser.add_argument("--usb-uri", help="USB device URI from 'sudo lpinfo -v', e.g. usb://Brother/PT-P710BT?serial=XXXX (recommended transport; needs sudo)")
     parser.add_argument("--device", help="paired Bluetooth serial device name, e.g. PT-P710BT-SerialPort (from tools/list_bt_serial_ports.py) -- experimental, may not work on your printer")
     parser.add_argument("--device-path", help="full path override instead of --device, e.g. /dev/cu.PT-P710BT-SerialPort")
@@ -168,12 +169,13 @@ def main() -> int:
     media = get_media(args.media)
     lines = generate(args.pattern, media, args.length)
 
-    builder = RasterJobBuilder(media, auto_cut=not args.no_cut)
+    builder = RasterJobBuilder(media, auto_cut=not args.no_cut, invert=args.invert)
     builder.add_lines(lines)
     data = builder.build()
 
     print(f"Pattern: {args.pattern}  Media: {media.name} ({media.print_dots} dots, "
-          f"{media.print_bytes} bytes/line)  Lines: {len(lines)}  Job size: {len(data)} bytes")
+          f"{media.print_bytes} bytes/line)  Lines: {len(lines)}  Job size: {len(data)} bytes"
+          f"{'  [INVERTED]' if args.invert else ''}")
 
     if args.verbose:
         print(f"  invalidate+init+raster-mode preamble: {data[:206].hex()}")

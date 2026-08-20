@@ -42,10 +42,25 @@ PI_FLAGS = 0x02 | 0x04 | 0x08 | 0x80
 class RasterJobBuilder:
     """Builds a Brother raster-mode print job for one label (one page)."""
 
-    def __init__(self, media: MediaSpec, *, auto_cut: bool = True, high_resolution: bool = False):
+    def __init__(
+        self,
+        media: MediaSpec,
+        *,
+        auto_cut: bool = True,
+        high_resolution: bool = False,
+        invert: bool = False,
+    ):
         self.media = media
         self.auto_cut = auto_cut
         self.high_resolution = high_resolution
+        # Some printers in this command family expect the opposite pixel
+        # polarity (0 = print, 1 = blank) instead of the 1 = print
+        # convention used everywhere else in this codebase. Confirmed on
+        # real PT-P710BT hardware: with invert=False, feed/cut/feed all
+        # happen exactly as expected but nothing prints -- consistent with
+        # every pixel being told "blank" because the polarity is flipped.
+        # See tools/test_print.py --invert.
+        self.invert = invert
         self._lines: List[bytes] = []
 
     def add_line(self, line_bits: bytes) -> None:
@@ -129,8 +144,9 @@ class RasterJobBuilder:
         #    the encoder simple and unambiguous; this costs a few bytes per
         #    blank line but removes a whole class of off-by-one bugs.
         for line in self._lines:
-            out += bytes([0x47, len(line) & 0xFF, (len(line) >> 8) & 0xFF])
-            out += line
+            wire_line = bytes(b ^ 0xFF for b in line) if self.invert else line
+            out += bytes([0x47, len(wire_line) & 0xFF, (len(wire_line) >> 8) & 0xFF])
+            out += wire_line
 
         # 9. Print with feeding: finalizes and (if auto-cut is on) cuts.
         out += b"\x1a"

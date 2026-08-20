@@ -125,6 +125,28 @@ def test_g_command_framing_and_length():
     assert set(covered_bits[:start] + covered_bits[end:]) <= {"0"}
 
 
+def test_invert_flips_only_the_raster_line_bytes():
+    media = get_media("24mm")  # full head width, offset 0, simplest to reason about
+    line = bytes([0b10110000]) + bytes([0x00] * (BYTES_PER_LINE - 1))
+
+    normal = RasterJobBuilder(media)
+    normal.add_line(line)
+    normal_data = normal.build()
+
+    inverted = RasterJobBuilder(media, invert=True)
+    inverted.add_line(line)
+    inverted_data = inverted.build()
+
+    # Everything except the raster line payloads should be identical.
+    assert normal_data[:227] == inverted_data[:227]
+    assert normal_data[-1:] == inverted_data[-1:]
+
+    preamble_len = 227
+    normal_payload = normal_data[preamble_len + 3 : preamble_len + 3 + BYTES_PER_LINE]
+    inverted_payload = inverted_data[preamble_len + 3 : preamble_len + 3 + BYTES_PER_LINE]
+    assert inverted_payload == bytes(b ^ 0xFF for b in normal_payload)
+
+
 def test_pack_bitmap_row():
     packed = pack_bitmap_row([1, 0, 1, 1, 0, 0, 0, 0, 1], n_bytes=2)
     assert packed == bytes([0b10110000, 0b10000000])
