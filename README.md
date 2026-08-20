@@ -16,16 +16,39 @@ only pairs with phones/tablets, not a Mac. The Bluetooth backend is kept
 in this repo in case it works for your unit or a future firmware update,
 but treat it as experimental and try USB first.
 
-**Protocol status:** confirmed printing real content over USB. Getting
-there took two hardware-tested fixes beyond the initial implementation:
-a missing "select compression mode" command (required before the printer
-will treat raster data as valid image data at all -- without it, feed/cut
-timing looked right but nothing printed) and a `feed_margin_mm` trailing
-feed before the cut (there's a physical gap between the print head and
-the cutter; a short job without enough trailing feed prints fine but the
-printed area doesn't clear the cutter, so most of it stays stuck inside
-the printer). Both are implemented now; alignment/width/cut-position
-details are still being refined against real prints.
+**Protocol status:** confirmed printing correctly, cutting correctly, and
+with correct polarity over USB, via the full real CUPS print path (not
+just the direct test tool). Getting there took several hardware-tested
+fixes beyond the initial implementation:
+- a missing "select compression mode" command (required before the
+  printer will treat raster data as valid image data at all -- without
+  it, feed/cut timing looked right but nothing printed)
+- a `feed_margin_mm` trailing feed before the cut (there's a physical gap
+  between the print head and the cutter; a short job without enough
+  trailing feed prints fine but the printed area doesn't clear the
+  cutter, so most of it stays stuck inside the printer)
+- bit 0x08 of the "advanced mode settings" byte, required for the printer
+  to actually cut at the end of a job -- without it, the printer would
+  print/feed correctly but only cut once a *next* job's Invalidate
+  sequence arrived, as if 0x00 there means "more labels may be coming"
+- the PPD's ColorModel used `cupsColorSpace 0` (CUPS_CSPACE_W, a
+  luminance/"0=black" convention) instead of `3` (CUPS_CSPACE_K, an ink
+  convention where 1=black) -- printed output was a photo negative of the
+  intended content (e.g. a solid black label with the actual text
+  showing through as unprinted gaps) until this was fixed
+- a bug in the CUPS Raster header parser: it stopped at `cupsRowStep`
+  (matching the shorter, legacy v1 page header) instead of reading the
+  full ~1796-byte v2 header real RaS2/RaS3 streams actually use, which
+  misaligned every field read after the header
+- the filter's Python library (`brother_ptraster/`) had to be vendored
+  next to the filter script under `/usr/libexec/cups/filter/` rather than
+  under `/usr/local`: cupsd runs filters under a filesystem sandbox that
+  doesn't allow reading `/usr/local`, even as root
+
+All fixed and covered by regression tests. Remaining known issue: printed
+text appears rotated (not just mirrored) -- macOS's `cgpdftoraster` applies
+its own `PreferredRotation` for this PPD's page geometry that hasn't been
+fully diagnosed yet; see "Known limitations" below.
 
 ## How it works
 
@@ -204,6 +227,15 @@ raster parsing/filter chain is also correct.
 
 ## Known limitations
 
+- **Printed content appears rotated.** Real hardware test showed correct
+  polarity and cut behavior, but the printed text is rotated relative to
+  the tape. `cgpdftoraster`'s own debug log shows it applying
+  `PreferredRotation = -90` for this PPD's page geometry (a narrow/tall
+  `PageSize`, typical for continuous label tape) — likely a heuristic
+  Apple's rasterizer applies that isn't yet compensated for here. Not yet
+  fixed; needs more investigation (possibly compensating for the rotation
+  in the filter, or finding a PPD setting that changes cgpdftoraster's
+  rotation choice).
 - **Bluetooth confirmed non-functional on at least one unit.** macOS
   showed the printer as "Connected" but no data was actually exchanged
   over the SPP serial port (confirmed both with this driver and a plain

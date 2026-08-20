@@ -8,7 +8,16 @@ printer family; see README.md for links and validation notes):
   Switch to raster mode    : ESC i a 01                 (1B 69 61 01)
   Print information command: ESC i z n1..n10             (1B 69 7A ...)
   Various mode settings    : ESC i M n                  (1B 69 4D n)   -- bit6 (0x40): auto-cut
-  Advanced mode settings   : ESC i K n                  (1B 69 4B n)
+  Advanced mode settings   : ESC i K n                  (1B 69 4B n)   -- bit3 (0x08): confirmed on real
+                                                                           hardware to be required for the
+                                                                           printer to actually cut at the
+                                                                           end of a job. Without it, content
+                                                                           prints and feeds correctly but
+                                                                           the printer withholds the cut
+                                                                           until a NEXT job's Invalidate
+                                                                           sequence arrives (as if 0x00
+                                                                           here means "more labels may be
+                                                                           coming, don't finalize yet").
   Feed amount              : ESC i d n1 n2               (1B 69 64 ..) -- little-endian dots
   Margin/page number, etc  : model dependent, omitted (defaults are fine)
   Select compression mode  : 'M' n                       (4D n)        -- NOT ESC-prefixed; distinct
@@ -178,11 +187,13 @@ class RasterJobBuilder:
             mode_byte = 0x40 if self.auto_cut else 0x00
         out += bytes([ESC, 0x69, 0x4D, mode_byte])
 
-        # 6. Advanced mode settings: bit6 = high resolution printing.
+        # 6. Advanced mode settings: bit6 = high resolution printing, bit3
+        #    = required for the printer to actually cut (see module
+        #    docstring) -- always set unless explicitly overridden.
         if self.advanced_byte_override is not None:
             adv = self.advanced_byte_override
         else:
-            adv = 0x40 if self.high_resolution else 0x00
+            adv = 0x08 | (0x40 if self.high_resolution else 0x00)
         out += bytes([ESC, 0x69, 0x4B, adv])
 
         # 7. Feed amount (margin applied after the printed content, before
