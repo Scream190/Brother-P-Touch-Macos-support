@@ -108,15 +108,18 @@
 *AutoCut False/No: ""
 *CloseUI: *AutoCut
 
-*% Applied ON TOP of the filter's mandatory structural transpose (see
-*% rastertoptp710bt) needed because this PPD declares pages wide. Real
-*% hardware test confirmed the correct combination for normal horizontal,
-*% unmirrored reading is None/True (the defaults below) -- kept as
-*% adjustable options (rather than baked silently into the mandatory
-*% transpose) so *ImageRotate can still be used to deliberately get the
-*% old vertical-reading orientation (Rotate90/Rotate270) if ever wanted.
-*% Read directly by the filter (rastertoptp710bt), not applied via
-*% setpagedevice/PostScript.
+*% The correct mirror correction (confirmed on real hardware) is now
+*% baked directly into the filter's mandatory transpose (see
+*% rastertoptp710bt) rather than left to this PPD default: lpadmin was
+*% found not to reliably refresh an existing queue's cached PPD copy
+*% (/etc/cups/ppd/<queue>.ppd kept a stale *DefaultImageMirror after
+*% `lpadmin -p ... -P ...` on the same queue name), so a PPD-only default
+*% wasn't dependable. These options now apply an ADDITIONAL rotate/mirror
+*% on top of the built-in correction -- both default off (no-op) -- e.g.
+*% to deliberately get the old vertical-reading orientation
+*% (Rotate90/Rotate270), or to flip the built-in mirror back off again if
+*% you ever need to (Rotate180+Mirror=True cancels it). Read directly by
+*% the filter, not applied via setpagedevice/PostScript.
 *OpenUI *ImageRotate/Rotate: PickOne
 *OrderDependency: 10 AnySetup *ImageRotate
 *DefaultImageRotate: None
@@ -128,7 +131,7 @@
 
 *OpenUI *ImageMirror/Mirror Image: Boolean
 *OrderDependency: 10 AnySetup *ImageMirror
-*DefaultImageMirror: True
+*DefaultImageMirror: False
 *ImageMirror True/Yes: ""
 *ImageMirror False/No: ""
 *CloseUI: *ImageMirror

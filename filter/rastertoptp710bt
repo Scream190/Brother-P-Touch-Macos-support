@@ -138,24 +138,31 @@ def main() -> int:
                 )
                 return 1
 
-            # Mandatory structural transpose: the PPD declares pages WIDE
-            # (Width = label length, Height = tape width) so cgpdftoraster
-            # renders normal horizontal text instead of auto-rotating for
-            # vertical reading (see the PPD's comment on *PageSize for why).
-            # But that means CUPS hands us rows that run along the LENGTH
-            # axis (page.width, potentially thousands of dots) with only
-            # page.height (tens of dots) of them -- the opposite of what
-            # the printer needs (many lines, each spanning the tape width).
-            # Transposing unconditionally fixes that; it is not a user
-            # preference, just how this page geometry has to be unpacked.
-            rows, width = transform_page(page.rows, page.width, rotate=90, mirror=False)
+            # Mandatory structural transpose + mirror: the PPD declares
+            # pages WIDE (Width = label length, Height = tape width) so
+            # cgpdftoraster renders normal horizontal text instead of
+            # auto-rotating for vertical reading (see the PPD's comment on
+            # *PageSize for why). But that means CUPS hands us rows that
+            # run along the LENGTH axis (page.width, potentially thousands
+            # of dots) with only page.height (tens of dots) of them -- the
+            # opposite of what the printer needs (many lines, each
+            # spanning the tape width). Transposing unconditionally fixes
+            # that; it is not a user preference, just how this page
+            # geometry has to be unpacked. The mirror is baked in here
+            # (not left to the PPD's *ImageMirror default) because that
+            # default was found, on real hardware, not to reliably take
+            # effect: cupsd/lpadmin can leave a stale cached copy of the
+            # queue's PPD (a different *DefaultImageMirror than the
+            # current source PPD file) even after `lpadmin -p ... -P ...`
+            # on an existing queue -- confirmed by inspecting
+            # /etc/cups/ppd/<queue>.ppd directly. Baking the fix into the
+            # filter's own logic sidesteps that entirely.
+            rows, width = transform_page(page.rows, page.width, rotate=90, mirror=True)
 
             # User-selectable rotate/mirror (see PPD *ImageRotate/
-            # *ImageMirror) apply ON TOP of the mandatory transpose above,
-            # e.g. to flip back to vertical-reading orientation or correct
-            # a mirrored/upside-down result if the transpose direction
-            # guessed above turns out to be the wrong one of the two valid
-            # options for a given print.
+            # *ImageMirror) apply ON TOP of the above, e.g. to flip back to
+            # vertical-reading orientation. Off by default, so this is a
+            # no-op unless the job's options explicitly ask for it.
             if rotate or mirror:
                 rows, width = transform_page(rows, width, rotate=rotate, mirror=mirror)
 
