@@ -42,7 +42,7 @@ from __future__ import annotations
 
 from typing import Iterable, List
 
-from .media import MediaSpec, HEAD_PINS, BYTES_PER_LINE
+from .media import MediaSpec, HEAD_PINS, BYTES_PER_LINE, DPI
 
 ESC = 0x1B
 
@@ -60,18 +60,24 @@ class RasterJobBuilder:
         auto_cut: bool = True,
         high_resolution: bool = False,
         invert: bool = False,
+        feed_margin_mm: float = 25.0,
     ):
         self.media = media
         self.auto_cut = auto_cut
         self.high_resolution = high_resolution
-        # Some printers in this command family expect the opposite pixel
-        # polarity (0 = print, 1 = blank) instead of the 1 = print
-        # convention used everywhere else in this codebase. Confirmed on
-        # real PT-P710BT hardware: with invert=False, feed/cut/feed all
-        # happen exactly as expected but nothing prints -- consistent with
-        # every pixel being told "blank" because the polarity is flipped.
-        # See tools/test_print.py --invert.
+        # Kept as an option after hardware testing ruled it out as the fix
+        # for "nothing prints" (that turned out to be the missing
+        # compression-mode-select command, see below) -- but some unit in
+        # this printer family could still turn out to need it, so it's
+        # cheap to leave available. See tools/test_print.py --invert.
         self.invert = invert
+        # The gap between the print head and the cutter means a short job
+        # can finish printing before the printed area has physically
+        # reached the cutter -- confirmed on real hardware: most of a
+        # ~28mm test print stayed stuck inside the printer after cutting.
+        # This sets the trailing feed (in dots) applied before the final
+        # cut so the printed content actually clears the cutter and ejects.
+        self.feed_margin_dots = round(feed_margin_mm / 25.4 * DPI)
         self._lines: List[bytes] = []
 
     def add_line(self, line_bits: bytes) -> None:
@@ -147,8 +153,10 @@ class RasterJobBuilder:
         adv = 0x40 if self.high_resolution else 0x00
         out += bytes([ESC, 0x69, 0x4B, adv])
 
-        # 7. Feed amount: leave at printer default (no explicit command
-        #    needed; omitting it keeps the firmware's built-in margin).
+        # 7. Feed amount (margin applied after the printed content, before
+        #    the cut). See __init__ for why this needs to be generous.
+        margin = max(0, min(0xFFFF, self.feed_margin_dots))
+        out += bytes([ESC, 0x69, 0x64, margin & 0xFF, (margin >> 8) & 0xFF])
 
         # 8. Select compression mode: none. NOT ESC-prefixed -- distinct
         #    from the "various mode settings" ESC i M command above despite

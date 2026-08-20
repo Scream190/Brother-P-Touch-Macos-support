@@ -16,6 +16,17 @@ only pairs with phones/tablets, not a Mac. The Bluetooth backend is kept
 in this repo in case it works for your unit or a future firmware update,
 but treat it as experimental and try USB first.
 
+**Protocol status:** confirmed printing real content over USB. Getting
+there took two hardware-tested fixes beyond the initial implementation:
+a missing "select compression mode" command (required before the printer
+will treat raster data as valid image data at all -- without it, feed/cut
+timing looked right but nothing printed) and a `feed_margin_mm` trailing
+feed before the cut (there's a physical gap between the print head and
+the cutter; a short job without enough trailing feed prints fine but the
+printed area doesn't clear the cutter, so most of it stays stuck inside
+the printer). Both are implemented now; alignment/width/cut-position
+details are still being refined against real prints.
+
 ## How it works
 
 This project adds a standard CUPS driver made of three pieces:

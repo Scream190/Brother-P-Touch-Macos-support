@@ -97,6 +97,27 @@ def test_raster_line_rejects_wrong_length():
         raise AssertionError("expected ValueError for a mis-sized raster line")
 
 
+def test_feed_amount_command_encodes_margin_in_dots():
+    media = get_media("12mm")
+    builder = RasterJobBuilder(media, feed_margin_mm=25.0)
+    builder.add_line(b"\x00" * media.print_bytes)
+    data = builder.build()
+
+    feed_cmd_start = 200 + 2 + 4 + 13 + 4 + 4  # right after advanced settings
+    assert data[feed_cmd_start : feed_cmd_start + 3] == bytes([ESC, 0x69, 0x64])
+    margin_dots = int.from_bytes(data[feed_cmd_start + 3 : feed_cmd_start + 5], "little")
+    assert margin_dots == round(25.0 / 25.4 * 180)
+
+
+def test_feed_margin_defaults_to_a_generous_nonzero_value():
+    # Confirmed on real hardware: without an explicit trailing feed, most of
+    # a short print job stayed physically stuck between the print head and
+    # the cutter after "cutting". The default must not be 0.
+    media = get_media("12mm")
+    builder = RasterJobBuilder(media)
+    assert builder.feed_margin_dots > 0
+
+
 def test_g_command_framing_and_length():
     media = get_media("6mm")  # width < full head, exercises padding path
     builder = RasterJobBuilder(media)
@@ -110,8 +131,8 @@ def test_g_command_framing_and_length():
     # Find the 'G' raster transfer command after the fixed-size preamble:
     # 200 invalidate + 2 initialize + 4 raster-mode + 13 print-info-command
     # (3-byte header + 10 data bytes) + 4 mode-settings + 4 advanced-settings
-    # + 2 compression-mode-select.
-    preamble_len = 200 + 2 + 4 + 13 + 4 + 4 + 2
+    # + 5 feed-amount + 2 compression-mode-select.
+    preamble_len = 200 + 2 + 4 + 13 + 4 + 4 + 5 + 2
     assert data[preamble_len] == 0x47  # 'G'
     length = int.from_bytes(data[preamble_len + 1 : preamble_len + 3], "little")
     assert length == BYTES_PER_LINE
@@ -139,10 +160,10 @@ def test_invert_flips_only_the_raster_line_bytes():
     inverted_data = inverted.build()
 
     # Everything except the raster line payloads should be identical.
-    assert normal_data[:229] == inverted_data[:229]
+    assert normal_data[:234] == inverted_data[:234]
     assert normal_data[-1:] == inverted_data[-1:]
 
-    preamble_len = 229
+    preamble_len = 234
     normal_payload = normal_data[preamble_len + 3 : preamble_len + 3 + BYTES_PER_LINE]
     inverted_payload = inverted_data[preamble_len + 3 : preamble_len + 3 + BYTES_PER_LINE]
     assert inverted_payload == bytes(b ^ 0xFF for b in normal_payload)

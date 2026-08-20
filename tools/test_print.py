@@ -157,6 +157,7 @@ def main() -> int:
     parser.add_argument("--pattern", choices=PATTERNS, default="ruler", help="test pattern to print")
     parser.add_argument("--length", type=int, default=200, help="label length in dots (180 dots ~= 25.4mm at 180dpi)")
     parser.add_argument("--no-cut", action="store_true", help="disable auto-cut after printing")
+    parser.add_argument("--feed-margin-mm", type=float, default=25.0, help="trailing feed before the cut, in mm (default 25; raise this if the printed area doesn't fully eject/get cut)")
     parser.add_argument("--invert", action="store_true", help="flip pixel polarity (try this if feed/cut work but nothing visibly prints)")
     parser.add_argument("--usb-uri", help="USB device URI from 'sudo lpinfo -v', e.g. usb://Brother/PT-P710BT?serial=XXXX (recommended transport; needs sudo)")
     parser.add_argument("--device", help="paired Bluetooth serial device name, e.g. PT-P710BT-SerialPort (from tools/list_bt_serial_ports.py) -- experimental, may not work on your printer")
@@ -169,7 +170,9 @@ def main() -> int:
     media = get_media(args.media)
     lines = generate(args.pattern, media, args.length)
 
-    builder = RasterJobBuilder(media, auto_cut=not args.no_cut, invert=args.invert)
+    builder = RasterJobBuilder(
+        media, auto_cut=not args.no_cut, invert=args.invert, feed_margin_mm=args.feed_margin_mm
+    )
     builder.add_lines(lines)
     data = builder.build()
 
@@ -182,8 +185,9 @@ def main() -> int:
         print(f"  print-information command:            {data[206:219].hex()}")
         print(f"  mode settings:                        {data[219:223].hex()}")
         print(f"  advanced settings:                    {data[223:227].hex()}")
-        print(f"  compression mode select:              {data[227:229].hex()}")
-        print(f"  first raster line ('G' + len + data):  {data[229:229 + 3 + media.print_bytes].hex()}")
+        print(f"  feed amount (margin):                 {data[227:232].hex()}")
+        print(f"  compression mode select:              {data[232:234].hex()}")
+        print(f"  first raster line ('G' + len + data):  {data[234:234 + 3 + media.print_bytes].hex()}")
         print(f"  last byte (should be 0x1a):            {data[-1:].hex()}")
 
     if args.out:
