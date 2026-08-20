@@ -134,6 +134,7 @@ def send_via_usb(usb_uri: str, data: bytes, verbose: bool) -> None:
         f.write(data)
         tmp_path = f.name
 
+    debug_log_path = None
     try:
         argv = build_usb_backend_argv("1", os.environ.get("USER", "user"), "test-print", tmp_path)
         env = dict(os.environ)
@@ -142,8 +143,12 @@ def send_via_usb(usb_uri: str, data: bytes, verbose: bool) -> None:
             # Unlocks full CUPS backend debug logging when run standalone
             # (outside cupsd) -- in particular this should hex-dump any
             # "back-channel data" the printer sends back (e.g. Brother's
-            # 32-byte status packet), not just how many bytes arrived.
-            env["CUPS_DEBUG_LOG"] = "-"
+            # 32-byte status packet), not just how many bytes arrived. Use
+            # an explicit file rather than "-" for stderr: that shorthand
+            # isn't reliably honored by every CUPS build, and an explicit
+            # path lets us just read it back ourselves either way.
+            debug_log_path = tempfile.mktemp(suffix=".cups-debug.log")
+            env["CUPS_DEBUG_LOG"] = debug_log_path
             env["CUPS_DEBUG_LEVEL"] = "2"
             print(f"(running: DEVICE_URI={usb_uri} {' '.join(argv)})", file=sys.stderr)
         result = subprocess.run(argv, env=env, capture_output=True, text=True)
@@ -151,10 +156,19 @@ def send_via_usb(usb_uri: str, data: bytes, verbose: bool) -> None:
             print(result.stdout, end="")
         if result.stderr:
             print(result.stderr, end="", file=sys.stderr)
+        if debug_log_path and os.path.exists(debug_log_path):
+            print(f"\n--- backend debug log ({debug_log_path}) ---", file=sys.stderr)
+            with open(debug_log_path, "r", errors="replace") as f:
+                print(f.read(), file=sys.stderr)
+            print("--- end debug log ---", file=sys.stderr)
+        elif verbose:
+            print("(no debug log file was created -- CUPS_DEBUG_LOG may not be honored on this macOS version)", file=sys.stderr)
         if result.returncode != 0:
             raise SystemExit(f"usb backend exited with code {result.returncode}")
     finally:
         os.unlink(tmp_path)
+        if debug_log_path and os.path.exists(debug_log_path):
+            os.unlink(debug_log_path)
 
 
 def main() -> int:
