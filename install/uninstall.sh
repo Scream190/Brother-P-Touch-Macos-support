@@ -16,10 +16,14 @@ BACKEND=/usr/libexec/cups/backend/ptp710bt
 PPD=/Library/Printers/PPDs/Contents/Resources/Brother_PT-P710BT.ppd
 
 echo "==> Removing any print queues using this driver"
+# Match by installed PPD (works for both the usb:// and ptp710bt:// device
+# URI schemes) rather than by device-uri scheme alone.
 if command -v lpstat >/dev/null; then
-  for queue in $(lpstat -v 2>/dev/null | grep 'ptp710bt://' | sed -E 's/device for ([^:]+):.*/\1/'); do
-    echo "    removing queue: $queue"
-    lpadmin -x "$queue" || true
+  for queue in $(lpstat -p 2>/dev/null | awk '{print $2}'); do
+    if grep -q 'Brother PT-P710BT' "/etc/cups/ppd/$queue.ppd" 2>/dev/null; then
+      echo "    removing queue: $queue"
+      lpadmin -x "$queue" || true
+    fi
   done
 fi
 

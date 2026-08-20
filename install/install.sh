@@ -1,6 +1,13 @@
 #!/bin/bash
-# Installs the Brother PT-P710BT CUPS driver (filter, backend, PPD, and the
-# brother_ptraster Python library they both depend on).
+# Installs the Brother PT-P710BT CUPS driver (filter, PPD, the Bluetooth
+# backend, and the brother_ptraster Python library the filter/backend
+# depend on).
+#
+# USB is the recommended/confirmed-working transport: it uses macOS's own
+# built-in 'usb' CUPS backend, so no custom backend is needed for it. The
+# custom ptp710bt Bluetooth backend is still installed for anyone whose
+# unit does pair correctly, but Bluetooth SPP was confirmed NON-functional
+# on at least one PT-P710BT (it only pairs with phones); see README.md.
 #
 # Verified writable on modern macOS (SIP/Signed System Volume enabled) as of
 # Sonoma on Apple Silicon: /usr/libexec/cups/{filter,backend} and /usr/local
@@ -13,7 +20,7 @@
 #
 # After installing, add the printer queue with lpadmin (see README.md), e.g.:
 #   sudo lpadmin -p PT-P710BT -E \
-#     -v ptp710bt://PT-P710BT-SerialPort \
+#     -v 'usb://Brother/PT-P710BT?serial=XXXXXXXXX' \
 #     -P /Library/Printers/PPDs/Contents/Resources/Brother_PT-P710BT.ppd
 set -euo pipefail
 
@@ -57,17 +64,21 @@ launchctl kickstart -k system/org.cups.cupsd
 
 cat <<EOF
 
-Driver files installed. Next steps:
+Driver files installed. Next steps (USB, recommended):
 
-1. Pair the PT-P710BT in System Settings > Bluetooth if you haven't already.
-2. Find its serial device name:
-     python3 "$REPO_DIR/tools/list_bt_serial_ports.py"
-3. Add the print queue (replace SERIALNAME with what step 2 found):
+1. Connect the PT-P710BT via USB and power it on.
+2. Find its USB device URI:
+     sudo lpinfo -v | grep -i usb
+3. Add the print queue (replace the -v value with what step 2 found):
      sudo lpadmin -p PT-P710BT -E \\
-       -v ptp710bt://SERIALNAME \\
+       -v 'usb://Brother/PT-P710BT?serial=XXXXXXXXX' \\
        -P "$PPD_DIR/Brother_PT-P710BT.ppd"
 4. Print a test label:
      lp -d PT-P710BT -o media=mm12 /path/to/some/file.pdf
+
+Bluetooth is also supported (custom ptp710bt:// backend) but was confirmed
+NOT to work on at least one PT-P710BT unit -- see README.md before relying
+on it.
 
 See README.md for troubleshooting and protocol validation notes.
 EOF

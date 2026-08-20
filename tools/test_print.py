@@ -4,18 +4,32 @@
 Sends a raster-mode print job STRAIGHT to the printer, bypassing CUPS
 entirely. This is deliberately separate from the CUPS filter/backend so a
 print made with this tool tells you whether the *protocol* is right,
-without CUPS's own PDF/PostScript rasterization in the loop too.
+without CUPS's own PDF/PostScript rasterization in the loop too. Brother's
+raster-mode command protocol is the same regardless of transport, so this
+works for USB or Bluetooth -- only the last step (how the bytes physically
+reach the printer) differs.
 
-Examples:
-    # Just look at what would be sent, without a printer:
-    python3 tools/test_print.py --media 12mm --pattern ruler --dry-run --out /tmp/job.bin
+USB (recommended -- confirmed working transport for at least one PT-P710BT
+unit; Bluetooth SPP was confirmed non-functional on the same unit, pairing
+only with phones):
 
-    # Find the paired device name first:
+    # Find the USB device URI (needs sudo to see USB printers):
+    sudo lpinfo -v | grep -i usb
+
+    # Send a test print over USB (also needs sudo, since talking to the raw
+    # USB device requires it, same as the real CUPS 'usb' backend does):
+    sudo python3 tools/test_print.py --media 12mm --pattern ruler \\
+        --usb-uri 'usb://Brother/PT-P710BT?serial=XXXXXXXXX'
+
+Bluetooth (experimental / may not work on your unit):
+
     python3 tools/list_bt_serial_ports.py
-
-    # Then send a real test print:
     python3 tools/test_print.py --media 12mm --pattern diagonal \\
         --device PT-P710BT-SerialPort
+
+Dry run (no printer needed):
+
+    python3 tools/test_print.py --media 12mm --pattern ruler --dry-run --out /tmp/job.bin
 
 Run through the patterns in this rough order, since each isolates a
 different class of bug:
@@ -32,7 +46,9 @@ against what the real printer actually did.
 """
 import argparse
 import os
+import subprocess
 import sys
+import tempfile
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -40,6 +56,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from brother_ptraster.media import MEDIA_TABLE, get_media
 from brother_ptraster.patterns import PATTERNS, generate
 from brother_ptraster.protocol import RasterJobBuilder
+
+USB_BACKEND = "/usr/libexec/cups/backend/usb"
 
 
 def send_to_device(device_path: str, data: bytes, verbose: bool, connect_delay: float = 0.5) -> None:
@@ -89,13 +107,58 @@ def send_to_device(device_path: str, data: bytes, verbose: bool, connect_delay: 
         os.close(fd)
 
 
+def build_usb_backend_argv(job_id: str, user: str, title: str, tmp_path: str) -> list:
+    """Construct the argv CUPS itself would use to invoke the usb backend.
+
+    Split out from send_via_usb() so the argument construction can be
+    tested without actually invoking the (root-only, macOS-only) backend.
+    """
+    return [USB_BACKEND, job_id, user, title, "1", "", tmp_path]
+
+
+def send_via_usb(usb_uri: str, data: bytes, verbose: bool) -> None:
+    """Send a job by directly invoking macOS's own signed CUPS usb backend.
+
+    This reuses Apple's backend for the actual USB I/O (which macOS doesn't
+    expose through a simple writable /dev node the way it does Bluetooth
+    serial ports) instead of reimplementing USB printer access. It's the
+    same binary a real CUPS queue would use, just invoked by hand with our
+    raw command bytes instead of a rasterized job from CUPS.
+    """
+    if not os.path.exists(USB_BACKEND):
+        raise SystemExit(f"{USB_BACKEND} not found -- unexpected on macOS.")
+    if os.geteuid() != 0:
+        raise SystemExit("Talking to the USB backend directly needs root: re-run with sudo.")
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
+        f.write(data)
+        tmp_path = f.name
+
+    try:
+        argv = build_usb_backend_argv("1", os.environ.get("USER", "user"), "test-print", tmp_path)
+        env = dict(os.environ)
+        env["DEVICE_URI"] = usb_uri
+        if verbose:
+            print(f"(running: DEVICE_URI={usb_uri} {' '.join(argv)})", file=sys.stderr)
+        result = subprocess.run(argv, env=env, capture_output=True, text=True)
+        if result.stdout and verbose:
+            print(result.stdout, end="")
+        if result.stderr:
+            print(result.stderr, end="", file=sys.stderr)
+        if result.returncode != 0:
+            raise SystemExit(f"usb backend exited with code {result.returncode}")
+    finally:
+        os.unlink(tmp_path)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--media", choices=sorted(MEDIA_TABLE), default="12mm", help="tape width loaded in the printer")
     parser.add_argument("--pattern", choices=PATTERNS, default="ruler", help="test pattern to print")
     parser.add_argument("--length", type=int, default=200, help="label length in dots (180 dots ~= 25.4mm at 180dpi)")
     parser.add_argument("--no-cut", action="store_true", help="disable auto-cut after printing")
-    parser.add_argument("--device", help="paired Bluetooth serial device name, e.g. PT-P710BT-SerialPort (from tools/list_bt_serial_ports.py)")
+    parser.add_argument("--usb-uri", help="USB device URI from 'sudo lpinfo -v', e.g. usb://Brother/PT-P710BT?serial=XXXX (recommended transport; needs sudo)")
+    parser.add_argument("--device", help="paired Bluetooth serial device name, e.g. PT-P710BT-SerialPort (from tools/list_bt_serial_ports.py) -- experimental, may not work on your printer")
     parser.add_argument("--device-path", help="full path override instead of --device, e.g. /dev/cu.PT-P710BT-SerialPort")
     parser.add_argument("--dry-run", action="store_true", help="don't send anything; just build the job")
     parser.add_argument("--out", help="write the raw command bytes to this file (useful with --dry-run, or to double-check a real send)")
@@ -129,12 +192,21 @@ def main() -> int:
         print("--dry-run set: not sending anything to a printer.")
         return 0
 
+    if args.usb_uri:
+        print(f"Sending to {args.usb_uri} via the system usb backend...")
+        send_via_usb(args.usb_uri, data, args.verbose)
+        print("Sent. Check the printer.")
+        return 0
+
     if args.device_path:
         device_path = args.device_path
     elif args.device:
         device_path = f"/dev/cu.{args.device}"
     else:
-        raise SystemExit("Specify --device NAME (see tools/list_bt_serial_ports.py) or --device-path, or pass --dry-run.")
+        raise SystemExit(
+            "Specify --usb-uri (recommended, see 'sudo lpinfo -v'), or "
+            "--device/--device-path for Bluetooth, or pass --dry-run."
+        )
 
     print(f"Sending to {device_path} ...")
     send_to_device(device_path, data, args.verbose)
