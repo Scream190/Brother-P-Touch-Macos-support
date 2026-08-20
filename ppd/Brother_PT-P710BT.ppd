@@ -102,10 +102,19 @@
 *OpenUI *ColorModel/Color Mode: PickOne
 *OrderDependency: 10 AnySetup *ColorModel
 *DefaultColorModel: Gray
-*ColorModel Gray/Black and White: "<</cupsColorSpace 0/cupsBitsPerColor 1/cupsColorOrder 0/cupsCompression 0>>setpagedevice"
+*% cupsColorSpace 3 = CUPS_CSPACE_K ("Black", an ink/toner model: higher
+*% value = more ink = darker). NOT 0 (CUPS_CSPACE_W, "Luminance": higher
+*% value = more light = whiter, the opposite of what a 1-bit-per-pixel
+*% "1 = print black" printer driver wants). Confirmed on real hardware:
+*% with cupsColorSpace 0, text printed as a photo negative -- a solid
+*% black field with the actual glyph shapes showing through as unprinted
+*% (white) gaps, because CUPS encoded text pixels as 0 (black/no light)
+*% and background as 1 (white/full light), which this driver's raster
+*% encoder reads straight through as 0 = don't print, 1 = print.
+*ColorModel Gray/Black and White: "<</cupsColorSpace 3/cupsBitsPerColor 1/cupsColorOrder 0/cupsCompression 0>>setpagedevice"
 *CloseUI: *ColorModel
 
 *cupsBitsPerColor: 1
 *cupsColorOrder: Chunky
-*cupsColorSpace: Gray
+*cupsColorSpace: K
 *cupsCompression: 0
