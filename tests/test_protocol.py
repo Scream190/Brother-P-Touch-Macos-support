@@ -51,7 +51,7 @@ def test_nearest_media_rejects_far_off_widths():
 
 def test_build_starts_with_invalidate_and_initialize():
     media = get_media("12mm")
-    builder = RasterJobBuilder(media)
+    builder = RasterJobBuilder(media, leading_cleanup=False)
     builder.add_line(b"\x00" * media.print_bytes)
     data = builder.build()
 
@@ -62,7 +62,7 @@ def test_build_starts_with_invalidate_and_initialize():
 
 def test_print_information_command_encodes_line_count():
     media = get_media("12mm")
-    builder = RasterJobBuilder(media)
+    builder = RasterJobBuilder(media, leading_cleanup=False)
     for _ in range(5):
         builder.add_line(b"\x00" * media.print_bytes)
     data = builder.build()
@@ -86,9 +86,36 @@ def test_job_ends_with_print_and_feed():
     assert data[-1:] == b"\x1a"
 
 
+def test_leading_cleanup_defaults_on_and_prepends_a_zero_line_segment():
+    media = get_media("12mm")
+    with_cleanup = RasterJobBuilder(media)
+    with_cleanup.add_line(b"\x00" * media.print_bytes)
+    with_data = with_cleanup.build()
+
+    without_cleanup = RasterJobBuilder(media, leading_cleanup=False)
+    without_cleanup.add_line(b"\x00" * media.print_bytes)
+    without_data = without_cleanup.build()
+
+    # The cleanup segment is a full, independent segment (same framing as
+    # a real one, just declaring 0 raster lines) prepended before the real
+    # job's own segment, which should appear unchanged right after it.
+    assert with_data.endswith(without_data)
+    assert len(with_data) > len(without_data)
+
+    cleanup_segment = with_data[: len(with_data) - len(without_data)]
+    assert cleanup_segment[:200] == b"\x00" * 200
+    assert cleanup_segment[200:202] == bytes([ESC, 0x40])
+    assert cleanup_segment.endswith(b"\x1a")
+    # 0 raster lines declared, and no 'G' commands at all.
+    pic_start = 206
+    raster_count = int.from_bytes(cleanup_segment[pic_start + 7 : pic_start + 11], "little")
+    assert raster_count == 0
+    assert b"\x47" not in cleanup_segment[pic_start + 11 :]
+
+
 def test_mode_and_advanced_byte_overrides():
     media = get_media("12mm")
-    builder = RasterJobBuilder(media, mode_byte=0x48, advanced_byte=0x08)
+    builder = RasterJobBuilder(media, mode_byte=0x48, advanced_byte=0x08, leading_cleanup=False)
     builder.add_line(b"\x00" * media.print_bytes)
     data = builder.build()
 
@@ -127,7 +154,7 @@ def test_raster_line_rejects_wrong_length():
 
 def test_feed_amount_command_encodes_margin_in_dots():
     media = get_media("12mm")
-    builder = RasterJobBuilder(media, feed_margin_mm=25.0)
+    builder = RasterJobBuilder(media, feed_margin_mm=25.0, leading_cleanup=False)
     builder.add_line(b"\x00" * media.print_bytes)
     data = builder.build()
 
@@ -148,7 +175,7 @@ def test_feed_margin_defaults_to_a_generous_nonzero_value():
 
 def test_g_command_framing_and_length():
     media = get_media("6mm")  # width < full head, exercises padding path
-    builder = RasterJobBuilder(media)
+    builder = RasterJobBuilder(media, leading_cleanup=False)
     # Only the media's actual print_dots are meaningful pixels; any trailing
     # bits within print_bytes are byte-alignment padding a real CUPS raster
     # row would leave as 0, so build the line the same way.
@@ -179,11 +206,11 @@ def test_invert_flips_only_the_raster_line_bytes():
     media = get_media("24mm")  # full head width, offset 0, simplest to reason about
     line = bytes([0b10110000]) + bytes([0x00] * (BYTES_PER_LINE - 1))
 
-    normal = RasterJobBuilder(media)
+    normal = RasterJobBuilder(media, leading_cleanup=False)
     normal.add_line(line)
     normal_data = normal.build()
 
-    inverted = RasterJobBuilder(media, invert=True)
+    inverted = RasterJobBuilder(media, invert=True, leading_cleanup=False)
     inverted.add_line(line)
     inverted_data = inverted.build()
 
@@ -204,7 +231,7 @@ def test_pack_bitmap_row():
 
 def test_multiple_lines_produce_multiple_g_commands():
     media = get_media("12mm")
-    builder = RasterJobBuilder(media, auto_cut=False)
+    builder = RasterJobBuilder(media, auto_cut=False, leading_cleanup=False)
     for _ in range(3):
         builder.add_line(b"\x00" * media.print_bytes)
     data = builder.build()

@@ -73,6 +73,7 @@ class RasterJobBuilder:
         trailing_invalidate: bool = False,
         mode_byte: "int | None" = None,
         advanced_byte: "int | None" = None,
+        leading_cleanup: bool = True,
     ):
         self.media = media
         self.auto_cut = auto_cut
@@ -112,6 +113,14 @@ class RasterJobBuilder:
         # This sets the trailing feed (in dots) applied before the final
         # cut so the printed content actually clears the cutter and ejects.
         self.feed_margin_dots = round(feed_margin_mm / 25.4 * DPI)
+        # User-requested (real hardware use): every job starts with its own
+        # tiny feed+cut cycle first (0 raster lines, so it's just the
+        # control-command overhead -- feed the margin, then cut), so each
+        # label always starts on a freshly-cut, consistent tape edge
+        # regardless of whatever came before. Independent of the
+        # auto_cut/advanced-byte fix for cutting at the END of a job; this
+        # is a deliberate extra segment prepended to every transmission.
+        self.leading_cleanup = leading_cleanup
         self._lines: List[bytes] = []
 
     def add_line(self, line_bits: bytes) -> None:
@@ -150,7 +159,13 @@ class RasterJobBuilder:
                 buf[tail_idx] |= carry
         return bytes(buf)
 
-    def build(self) -> bytes:
+    def _build_segment(self, lines: List[bytes]) -> bytes:
+        """Build one complete job segment: Invalidate through the final
+        print-with-feed byte, for the given (already head-padded) lines.
+        Shared by the real content and the optional leading cleanup
+        segment (called with an empty list -- feed the margin and cut,
+        with no raster data at all).
+        """
         out = bytearray()
 
         # 1. Invalidate: clear any partial command sequence in the printer's
@@ -164,7 +179,7 @@ class RasterJobBuilder:
         out += bytes([ESC, 0x69, 0x61, 0x01])
 
         # 4. Print information command.
-        n5_8 = len(self._lines).to_bytes(4, "little")
+        n5_8 = len(lines).to_bytes(4, "little")
         out += bytes(
             [
                 ESC,
@@ -211,13 +226,23 @@ class RasterJobBuilder:
         #    sent explicitly (rather than using the 'Z' shortcut) to keep
         #    the encoder simple and unambiguous; this costs a few bytes per
         #    blank line but removes a whole class of off-by-one bugs.
-        for line in self._lines:
+        for line in lines:
             wire_line = bytes(b ^ 0xFF for b in line) if self.invert else line
             out += bytes([0x47, len(wire_line) & 0xFF, (len(wire_line) >> 8) & 0xFF])
             out += wire_line
 
         # 10. Print with feeding: finalizes and (if auto-cut is on) cuts.
         out += b"\x1a"
+
+        return bytes(out)
+
+    def build(self) -> bytes:
+        out = bytearray()
+
+        if self.leading_cleanup:
+            out += self._build_segment([])
+
+        out += self._build_segment(self._lines)
 
         if self.trailing_invalidate:
             out += b"\x00" * 200
