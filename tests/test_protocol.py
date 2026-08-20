@@ -86,6 +86,22 @@ def test_job_ends_with_print_and_feed():
     assert data[-1:] == b"\x1a"
 
 
+def test_trailing_invalidate_appends_second_invalidate_and_init():
+    media = get_media("12mm")
+    without = RasterJobBuilder(media)
+    without.add_line(b"\x00" * media.print_bytes)
+    without_data = without.build()
+
+    builder = RasterJobBuilder(media, trailing_invalidate=True)
+    builder.add_line(b"\x00" * media.print_bytes)
+    data = builder.build()
+
+    assert len(data) == len(without_data) + 202
+    assert data[: len(without_data)] == without_data
+    assert data[len(without_data) : len(without_data) + 200] == b"\x00" * 200
+    assert data[-2:] == bytes([ESC, 0x40])
+
+
 def test_raster_line_rejects_wrong_length():
     media = get_media("12mm")
     builder = RasterJobBuilder(media)

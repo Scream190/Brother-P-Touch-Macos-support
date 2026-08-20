@@ -61,10 +61,21 @@ class RasterJobBuilder:
         high_resolution: bool = False,
         invert: bool = False,
         feed_margin_mm: float = 25.0,
+        trailing_invalidate: bool = False,
     ):
         self.media = media
         self.auto_cut = auto_cut
         self.high_resolution = high_resolution
+        # Experimental: real hardware test found the printer reliably cuts
+        # off whatever's hanging out of a PREVIOUS job the moment the NEXT
+        # job's Invalidate+Initialize sequence arrives, but not at the end
+        # of the job that's actually finishing -- as if cutting is really
+        # tied to "a new job is starting" rather than our auto-cut flag.
+        # This appends a second Invalidate+Initialize after the real job,
+        # within the same transmission, to try to trigger that same
+        # behavior without needing an actual follow-up job.
+        # See tools/test_print.py --trailing-invalidate.
+        self.trailing_invalidate = trailing_invalidate
         # Kept as an option after hardware testing ruled it out as the fix
         # for "nothing prints" (that turned out to be the missing
         # compression-mode-select command, see below) -- but some unit in
@@ -175,6 +186,10 @@ class RasterJobBuilder:
 
         # 10. Print with feeding: finalizes and (if auto-cut is on) cuts.
         out += b"\x1a"
+
+        if self.trailing_invalidate:
+            out += b"\x00" * 200
+            out += bytes([ESC, 0x40])
 
         return bytes(out)
 
