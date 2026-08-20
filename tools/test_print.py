@@ -139,6 +139,12 @@ def send_via_usb(usb_uri: str, data: bytes, verbose: bool) -> None:
         env = dict(os.environ)
         env["DEVICE_URI"] = usb_uri
         if verbose:
+            # Unlocks full CUPS backend debug logging when run standalone
+            # (outside cupsd) -- in particular this should hex-dump any
+            # "back-channel data" the printer sends back (e.g. Brother's
+            # 32-byte status packet), not just how many bytes arrived.
+            env["CUPS_DEBUG_LOG"] = "-"
+            env["CUPS_DEBUG_LEVEL"] = "2"
             print(f"(running: DEVICE_URI={usb_uri} {' '.join(argv)})", file=sys.stderr)
         result = subprocess.run(argv, env=env, capture_output=True, text=True)
         if result.stdout and verbose:

@@ -7,7 +7,7 @@ printer family; see README.md for links and validation notes):
   Initialize               : ESC @                     (1B 40)
   Switch to raster mode    : ESC i a 01                 (1B 69 61 01)
   Print information command: ESC i z n1..n10             (1B 69 7A ...)
-  Various mode settings    : ESC i M n                  (1B 69 4D n)   -- bit0: auto-cut
+  Various mode settings    : ESC i M n                  (1B 69 4D n)   -- bit6 (0x40): auto-cut
   Advanced mode settings   : ESC i K n                  (1B 69 4B n)
   Feed amount              : ESC i d n1 n2               (1B 69 64 ..) -- little-endian dots
   Margin/page number, etc  : model dependent, omitted (defaults are fine)
