@@ -86,6 +86,18 @@ def test_job_ends_with_print_and_feed():
     assert data[-1:] == b"\x1a"
 
 
+def test_mode_and_advanced_byte_overrides():
+    media = get_media("12mm")
+    builder = RasterJobBuilder(media, mode_byte=0x48, advanced_byte=0x08)
+    builder.add_line(b"\x00" * media.print_bytes)
+    data = builder.build()
+
+    mode_start = 200 + 2 + 4 + 13  # right after print-information command
+    assert data[mode_start : mode_start + 4] == bytes([ESC, 0x69, 0x4D, 0x48])
+    adv_start = mode_start + 4
+    assert data[adv_start : adv_start + 4] == bytes([ESC, 0x69, 0x4B, 0x08])
+
+
 def test_trailing_invalidate_appends_second_invalidate_and_init():
     media = get_media("12mm")
     without = RasterJobBuilder(media)

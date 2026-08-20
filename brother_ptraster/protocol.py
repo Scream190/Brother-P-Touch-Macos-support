@@ -62,10 +62,24 @@ class RasterJobBuilder:
         invert: bool = False,
         feed_margin_mm: float = 25.0,
         trailing_invalidate: bool = False,
+        mode_byte: "int | None" = None,
+        advanced_byte: "int | None" = None,
     ):
         self.media = media
         self.auto_cut = auto_cut
         self.high_resolution = high_resolution
+        # Raw overrides for hardware bring-up: bypass auto_cut/
+        # high_resolution entirely and send this exact byte for "various
+        # mode settings" / "advanced mode settings" instead. Real hardware
+        # test found auto_cut (bit 0x40 of the mode byte) alone doesn't
+        # trigger a cut at the end of a job -- cutting only visibly
+        # happens once a NEXT job starts, suggesting a "chain printing"
+        # style bit (probably in the advanced settings byte) is left in
+        # the wrong state by the current default of 0x00. Lets
+        # tools/test_print.py --mode-byte/--advanced-byte try candidate
+        # values without needing a code change per attempt.
+        self.mode_byte_override = mode_byte
+        self.advanced_byte_override = advanced_byte
         # Experimental: real hardware test found the printer reliably cuts
         # off whatever's hanging out of a PREVIOUS job the moment the NEXT
         # job's Invalidate+Initialize sequence arrives, but not at the end
@@ -158,10 +172,17 @@ class RasterJobBuilder:
         )
 
         # 5. Various mode settings (auto-cut on/off).
-        out += bytes([ESC, 0x69, 0x4D, 0x40 if self.auto_cut else 0x00])
+        if self.mode_byte_override is not None:
+            mode_byte = self.mode_byte_override
+        else:
+            mode_byte = 0x40 if self.auto_cut else 0x00
+        out += bytes([ESC, 0x69, 0x4D, mode_byte])
 
         # 6. Advanced mode settings: bit6 = high resolution printing.
-        adv = 0x40 if self.high_resolution else 0x00
+        if self.advanced_byte_override is not None:
+            adv = self.advanced_byte_override
+        else:
+            adv = 0x40 if self.high_resolution else 0x00
         out += bytes([ESC, 0x69, 0x4B, adv])
 
         # 7. Feed amount (margin applied after the printed content, before
