@@ -33,6 +33,7 @@ against what the real printer actually did.
 import argparse
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
@@ -41,27 +42,49 @@ from brother_ptraster.patterns import PATTERNS, generate
 from brother_ptraster.protocol import RasterJobBuilder
 
 
-def send_to_device(device_path: str, data: bytes, verbose: bool) -> None:
+def send_to_device(device_path: str, data: bytes, verbose: bool, connect_delay: float = 0.5) -> None:
     if not os.path.exists(device_path):
         raise SystemExit(
             f"{device_path} not found. Is the printer paired (System Settings > "
             f"Bluetooth) and powered on? Run tools/list_bt_serial_ports.py to check."
         )
 
-    fd = os.open(device_path, os.O_WRONLY | os.O_NOCTTY)
+    # O_RDWR (not O_WRONLY): some macOS Bluetooth SPP virtual serial ports
+    # only fully bring up the RFCOMM connection when opened for both
+    # reading and writing.
+    fd = os.open(device_path, os.O_RDWR | os.O_NOCTTY)
     try:
         try:
+            import termios
             import tty
 
             tty.setraw(fd)
+            attrs = termios.tcgetattr(fd)
+            attrs[2] &= ~termios.CRTSCTS  # disable hardware flow control
+            termios.tcsetattr(fd, termios.TCSANOW, attrs)
         except Exception as exc:
             if verbose:
-                print(f"(could not set raw tty mode, continuing anyway: {exc})", file=sys.stderr)
+                print(f"(could not configure raw/flow-control tty mode, continuing anyway: {exc})", file=sys.stderr)
+
+        if connect_delay:
+            if verbose:
+                print(f"(waiting {connect_delay}s for the Bluetooth SPP connection to come up...)", file=sys.stderr)
+            time.sleep(connect_delay)
 
         written = 0
         while written < len(data):
             written += os.write(fd, data[written:])
         os.fsync(fd)
+
+        if verbose:
+            import select
+
+            readable, _, _ = select.select([fd], [], [], 1.0)
+            if readable:
+                reply = os.read(fd, 256)
+                print(f"(printer replied with {len(reply)} bytes: {reply.hex()})", file=sys.stderr)
+            else:
+                print("(no reply bytes from printer within 1s -- normal if it doesn't send status unprompted)", file=sys.stderr)
     finally:
         os.close(fd)
 

@@ -97,18 +97,30 @@ def send_job(device_path: str, data: bytes) -> int:
         return EXIT_RETRY
 
     try:
-        fd = os.open(device_path, os.O_WRONLY | os.O_NOCTTY)
+        # O_RDWR (not O_WRONLY): some macOS Bluetooth SPP virtual serial
+        # ports only fully bring up the RFCOMM connection when opened for
+        # both reading and writing.
+        fd = os.open(device_path, os.O_RDWR | os.O_NOCTTY)
     except OSError as exc:
         log("ERROR", f"could not open {device_path}: {exc}")
         return EXIT_RETRY
 
     try:
         try:
+            import termios
             import tty
 
             tty.setraw(fd)
+            attrs = termios.tcgetattr(fd)
+            attrs[2] &= ~termios.CRTSCTS  # disable hardware flow control
+            termios.tcsetattr(fd, termios.TCSANOW, attrs)
         except Exception as exc:  # pragma: no cover - best effort
-            log("DEBUG", f"could not set raw tty mode (continuing anyway): {exc}")
+            log("DEBUG", f"could not configure raw/flow-control tty mode (continuing anyway): {exc}")
+
+        # Give the Bluetooth SPP connection a moment to actually come up
+        # before writing -- opening the device node can return before the
+        # underlying RFCOMM channel is connected.
+        time.sleep(0.5)
 
         total = len(data)
         written = 0
