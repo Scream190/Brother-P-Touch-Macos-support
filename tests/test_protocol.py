@@ -109,8 +109,9 @@ def test_g_command_framing_and_length():
 
     # Find the 'G' raster transfer command after the fixed-size preamble:
     # 200 invalidate + 2 initialize + 4 raster-mode + 13 print-info-command
-    # (3-byte header + 10 data bytes) + 4 mode-settings + 4 advanced-settings.
-    preamble_len = 200 + 2 + 4 + 13 + 4 + 4
+    # (3-byte header + 10 data bytes) + 4 mode-settings + 4 advanced-settings
+    # + 2 compression-mode-select.
+    preamble_len = 200 + 2 + 4 + 13 + 4 + 4 + 2
     assert data[preamble_len] == 0x47  # 'G'
     length = int.from_bytes(data[preamble_len + 1 : preamble_len + 3], "little")
     assert length == BYTES_PER_LINE
@@ -138,10 +139,10 @@ def test_invert_flips_only_the_raster_line_bytes():
     inverted_data = inverted.build()
 
     # Everything except the raster line payloads should be identical.
-    assert normal_data[:227] == inverted_data[:227]
+    assert normal_data[:229] == inverted_data[:229]
     assert normal_data[-1:] == inverted_data[-1:]
 
-    preamble_len = 227
+    preamble_len = 229
     normal_payload = normal_data[preamble_len + 3 : preamble_len + 3 + BYTES_PER_LINE]
     inverted_payload = inverted_data[preamble_len + 3 : preamble_len + 3 + BYTES_PER_LINE]
     assert inverted_payload == bytes(b ^ 0xFF for b in normal_payload)

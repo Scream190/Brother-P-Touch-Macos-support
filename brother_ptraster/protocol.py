@@ -11,6 +11,17 @@ printer family; see README.md for links and validation notes):
   Advanced mode settings   : ESC i K n                  (1B 69 4B n)
   Feed amount              : ESC i d n1 n2               (1B 69 64 ..) -- little-endian dots
   Margin/page number, etc  : model dependent, omitted (defaults are fine)
+  Select compression mode  : 'M' n                       (4D n)        -- NOT ESC-prefixed; distinct
+                                                                           from "various mode settings"
+                                                                           above despite sharing the 'M'
+                                                                           byte. n=0x00: no compression.
+                                                                           Required before raster data on
+                                                                           at least some models -- omitting
+                                                                           it was found (via real hardware
+                                                                           test) to make the printer feed
+                                                                           and cut at the right length but
+                                                                           print nothing, regardless of
+                                                                           pixel polarity.
   Raster graphics transfer : 'G' n1 n2 <data>            (47 ..)       -- little-endian length + n bytes
   Zero raster line         : 'Z'                         (5A)
   Print (no cut, keep buf) : 0x0C
@@ -139,7 +150,13 @@ class RasterJobBuilder:
         # 7. Feed amount: leave at printer default (no explicit command
         #    needed; omitting it keeps the firmware's built-in margin).
 
-        # 8. Raster data, one 'G' command per line. All-zero lines are still
+        # 8. Select compression mode: none. NOT ESC-prefixed -- distinct
+        #    from the "various mode settings" ESC i M command above despite
+        #    sharing the 'M' byte. See the module docstring for why this is
+        #    required, not optional.
+        out += bytes([0x4D, 0x00])
+
+        # 9. Raster data, one 'G' command per line. All-zero lines are still
         #    sent explicitly (rather than using the 'Z' shortcut) to keep
         #    the encoder simple and unambiguous; this costs a few bytes per
         #    blank line but removes a whole class of off-by-one bugs.
@@ -148,7 +165,7 @@ class RasterJobBuilder:
             out += bytes([0x47, len(wire_line) & 0xFF, (len(wire_line) >> 8) & 0xFF])
             out += wire_line
 
-        # 9. Print with feeding: finalizes and (if auto-cut is on) cuts.
+        # 10. Print with feeding: finalizes and (if auto-cut is on) cuts.
         out += b"\x1a"
 
         return bytes(out)

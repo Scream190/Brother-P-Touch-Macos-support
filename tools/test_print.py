@@ -182,7 +182,8 @@ def main() -> int:
         print(f"  print-information command:            {data[206:219].hex()}")
         print(f"  mode settings:                        {data[219:223].hex()}")
         print(f"  advanced settings:                    {data[223:227].hex()}")
-        print(f"  first raster line ('G' + len + data):  {data[227:227 + 3 + media.print_bytes].hex()}")
+        print(f"  compression mode select:              {data[227:229].hex()}")
+        print(f"  first raster line ('G' + len + data):  {data[229:229 + 3 + media.print_bytes].hex()}")
         print(f"  last byte (should be 0x1a):            {data[-1:].hex()}")
 
     if args.out:
