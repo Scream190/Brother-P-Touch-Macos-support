@@ -37,7 +37,11 @@ else:
 
 from brother_ptraster.cups_raster import read_pages, RasterFormatError
 from brother_ptraster.media import DPI, nearest_media
+from brother_ptraster.orient import transform_page
 from brother_ptraster.protocol import RasterJobBuilder
+
+# PPD *ImageRotate choice names -> degrees clockwise.
+ROTATE_CHOICES = {"None": 0, "Rotate90": 90, "Rotate180": 180, "Rotate270": 270}
 
 
 def log(level: str, message: str) -> None:
@@ -92,8 +96,10 @@ def main() -> int:
 
     opts = parse_options(options_str)
     auto_cut = opts.get("AutoCut", "True") != "False"
+    rotate = ROTATE_CHOICES.get(opts.get("ImageRotate", "None"), 0)
+    mirror = opts.get("ImageMirror", "False") == "True"
 
-    log("INFO", f"auto_cut={auto_cut} copies={copies}")
+    log("INFO", f"auto_cut={auto_cut} rotate={rotate} mirror={mirror} copies={copies}")
 
     src = open(infile, "rb") if infile else sys.stdin.buffer
     out = sys.stdout.buffer
@@ -132,7 +138,12 @@ def main() -> int:
                 )
                 return 1
 
-            width_mm = page.width / dpi_x * 25.4
+            if rotate or mirror:
+                rows, width = transform_page(page.rows, page.width, rotate=rotate, mirror=mirror)
+            else:
+                rows, width = page.rows, page.width
+
+            width_mm = width / dpi_x * 25.4
             try:
                 media = nearest_media(width_mm)
             except ValueError as exc:
@@ -140,7 +151,7 @@ def main() -> int:
                 return 1
 
             builder = RasterJobBuilder(media, auto_cut=auto_cut)
-            for row in page.rows:
+            for row in rows:
                 if len(row) >= media.print_bytes:
                     line = row[: media.print_bytes]
                 else:
@@ -150,7 +161,7 @@ def main() -> int:
             log(
                 "DEBUG",
                 f"copy {copy + 1}/{copies} page {page_num}/{len(pages)}: "
-                f"media={media.name} {len(page.rows)} lines",
+                f"media={media.name} {len(rows)} lines",
             )
 
     out.flush()
