@@ -44,11 +44,27 @@ fixes beyond the initial implementation:
   next to the filter script under `/usr/libexec/cups/filter/` rather than
   under `/usr/local`: cupsd runs filters under a filesystem sandbox that
   doesn't allow reading `/usr/local`, even as root
+- printed text came out both rotated and mirrored. Root cause: the PPD
+  declared pages narrow-tall (width = tape width, height = a default
+  label length), so macOS's `cgpdftoraster` applied its own
+  `PreferredRotation` to fit text using the long axis as line-length
+  instead of squeezing it into the narrow width. Fixed by declaring pages
+  WIDE instead (width = label length, height = tape width) so
+  cgpdftoraster renders normal horizontal text directly; the filter now
+  always transposes the resulting raster grid (CUPS's rows run along the
+  now-swapped length axis, but the printer needs lines along the
+  tape-width axis) and applies an additional confirmed-correct mirror on
+  top (see the PPD's `*ImageRotate`/`*ImageMirror` options, still
+  adjustable if you want the old vertical-reading orientation instead)
 
-All fixed and covered by regression tests. Remaining known issue: printed
-text appears rotated (not just mirrored) -- macOS's `cgpdftoraster` applies
-its own `PreferredRotation` for this PPD's page geometry that hasn't been
-fully diagnosed yet; see "Known limitations" below.
+All fixed and covered by regression tests.
+
+**Do not re-enable `RasterJobBuilder(leading_cleanup=True)`** (an attempt
+at making every job start with its own feed+cut cycle) without very
+cautious, incremental hardware testing: it's confirmed to hang the
+printer/USB connection badly enough that only a full Mac restart recovers
+it, not power-cycling the printer or replugging the cable. It defaults to
+`False` and the CUPS filter doesn't touch that parameter.
 
 ## How it works
 
@@ -219,23 +235,15 @@ raster parsing/filter chain is also correct.
 
 - In the Print dialog, pick the **Tape Width** matching the cassette
   currently loaded (3.5/6/9/12/18/24 mm). The filter reads the actual page
-  width from the job to select the tape width, so this also works if you
-  define a custom paper size via "Manage Custom Sizes..." for a specific
-  label length — just set the width to match your tape.
+  dimensions from the job to select the tape width, so this also works if
+  you define a custom paper size via "Manage Custom Sizes..." for a
+  specific label length — this PPD declares pages wide (Width = label
+  length, Height = tape width), so set the *height* to match your tape.
 - **Cut Each Label** toggles auto-cut after each label.
 - From the command line: `lp -d PT-P710BT -o media=mm12 file.pdf`.
 
 ## Known limitations
 
-- **Printed content appears rotated.** Real hardware test showed correct
-  polarity and cut behavior, but the printed text is rotated relative to
-  the tape. `cgpdftoraster`'s own debug log shows it applying
-  `PreferredRotation = -90` for this PPD's page geometry (a narrow/tall
-  `PageSize`, typical for continuous label tape) — likely a heuristic
-  Apple's rasterizer applies that isn't yet compensated for here. Not yet
-  fixed; needs more investigation (possibly compensating for the rotation
-  in the filter, or finding a PPD setting that changes cgpdftoraster's
-  rotation choice).
 - **Bluetooth confirmed non-functional on at least one unit.** macOS
   showed the printer as "Connected" but no data was actually exchanged
   over the SPP serial port (confirmed both with this driver and a plain

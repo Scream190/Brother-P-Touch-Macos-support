@@ -108,13 +108,15 @@
 *AutoCut False/No: ""
 *CloseUI: *AutoCut
 
-*% macOS's cgpdftoraster applies its own rotation heuristic for this PPD's
-*% narrow/tall PageSize (continuous label tape); real hardware test found
-*% printed text comes out rotated AND mirrored relative to the intended
-*% reading direction. The exact correction hasn't been nailed down yet --
-*% these two options let you try rotation/mirror combinations via a plain
-*% "lp -o" flag without reinstalling the PPD each time. Read directly by
-*% the filter (rastertoptp710bt), not applied via setpagedevice/PostScript.
+*% Applied ON TOP of the filter's mandatory structural transpose (see
+*% rastertoptp710bt) needed because this PPD declares pages wide. Real
+*% hardware test confirmed the correct combination for normal horizontal,
+*% unmirrored reading is None/True (the defaults below) -- kept as
+*% adjustable options (rather than baked silently into the mandatory
+*% transpose) so *ImageRotate can still be used to deliberately get the
+*% old vertical-reading orientation (Rotate90/Rotate270) if ever wanted.
+*% Read directly by the filter (rastertoptp710bt), not applied via
+*% setpagedevice/PostScript.
 *OpenUI *ImageRotate/Rotate: PickOne
 *OrderDependency: 10 AnySetup *ImageRotate
 *DefaultImageRotate: None
@@ -126,7 +128,7 @@
 
 *OpenUI *ImageMirror/Mirror Image: Boolean
 *OrderDependency: 10 AnySetup *ImageMirror
-*DefaultImageMirror: False
+*DefaultImageMirror: True
 *ImageMirror True/Yes: ""
 *ImageMirror False/No: ""
 *CloseUI: *ImageMirror
