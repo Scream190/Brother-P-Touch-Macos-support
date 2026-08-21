@@ -43,6 +43,16 @@ class MediaSpec:
     def print_bytes(self) -> int:
         return -(-self.print_dots // 8)  # ceil div
 
+    @property
+    def ppd_option(self) -> str:
+        """The CUPS/PPD ``media=`` option value for this tape, e.g.
+        ``mm12`` for the "12mm" entry. NOT the same string as ``name``
+        (display-oriented, "12mm") -- the PPD's ``*PageSize`` choice names
+        are prefixed the other way around (``mm12``, ``mm3.5``, ...)
+        because PostScript/PPD option names can't start with a digit.
+        """
+        return f"mm{self.width_mm:g}"
+
 
 def _centered(width_mm: float) -> MediaSpec:
     print_dots = round(width_mm / 25.4 * DPI)

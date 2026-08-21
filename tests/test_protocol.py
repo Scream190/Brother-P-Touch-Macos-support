@@ -29,6 +29,19 @@ def test_24mm_uses_full_head():
     assert media.print_bytes == BYTES_PER_LINE
 
 
+def test_ppd_option_matches_the_ppds_pagesize_choice_names():
+    # The PPD's *PageSize choice names are "mmN" (mm3.5, mm6, mm9, mm12,
+    # mm18, mm24) -- the reverse of MediaSpec.name ("3.5mm", "12mm", ...).
+    # A tool reporting a "-o media=..." value to the user must use this
+    # form, not .name, or `lp` will reject/ignore the option.
+    expected = {
+        "3.5mm": "mm3.5", "6mm": "mm6", "9mm": "mm9",
+        "12mm": "mm12", "18mm": "mm18", "24mm": "mm24",
+    }
+    for name, ppd_option in expected.items():
+        assert get_media(name).ppd_option == ppd_option
+
+
 def test_nearest_media_matches_exact_widths():
     for name in ("3.5mm", "6mm", "9mm", "12mm", "18mm", "24mm"):
         media = get_media(name)

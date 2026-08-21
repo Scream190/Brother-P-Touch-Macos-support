@@ -67,7 +67,7 @@ def main() -> int:
                 f"exactly match a supported preset -- check media.py"
             )
         else:
-            print(f"\n-> use: lp -d PT-P710BT -o media={media.name} ...")
+            print(f"\n-> use: lp -d PT-P710BT -o media={media.ppd_option} ...")
 
     return 0
 
