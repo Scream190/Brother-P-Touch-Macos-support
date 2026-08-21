@@ -8,7 +8,7 @@ from brother_ptraster.status import decode
 
 def _packet(media_width=12, media_type=0x01, media_length=0, status_type=0x01,
             phase_type=0x00, phase_number=0, err1=0x00, err2=0x00,
-            tape_color=0x01, text_color=0x08):
+            tape_color=0x01, text_color=0x05):
     data = bytearray(32)
     data[8] = err1
     data[9] = err2

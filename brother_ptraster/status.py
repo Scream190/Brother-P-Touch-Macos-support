@@ -94,12 +94,16 @@ TAPE_COLORS = {
     0xFF: "incompatible",
 }
 
-# Text (print) color, byte 25. Same hardware-unconfirmed caveat as above.
+# Text (print) color, byte 25. 0x05 confirmed "black" on a real PT-P710BT
+# (the generic Brother QL/PT-family doc has 0x08 for black instead -- this
+# unit's firmware doesn't match that table exactly). The rest are still
+# unconfirmed guesses from that same generic doc.
 TEXT_COLORS = {
     0x01: "white",
     0x02: "other",
     0x04: "red",
-    0x08: "black",
+    0x05: "black",  # confirmed on real PT-P710BT hardware
+    0x08: "black (unconfirmed alt. code)",
     0x0A: "gold",
     0x62: "blue (fabric)",
     0xF0: "cleaning",
