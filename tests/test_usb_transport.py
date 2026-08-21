@@ -175,6 +175,50 @@ def test_find_device_raises_when_ambiguous_without_serial():
         _teardown_fake_pyusb()
 
 
+def test_find_device_uses_libusb_package_backend_when_available():
+    ep_out = _FakeEndpoint(ENDPOINT_OUT)
+    ep_in = _FakeEndpoint(ENDPOINT_IN, reply=b"\x00" * 32)
+    dev = _FakeDevice("000J4G980818", ep_out, ep_in)
+
+    fake_backend = object()
+    fake_libusb_package = types.ModuleType("libusb_package")
+    fake_libusb_package.get_libusb1_backend = lambda: fake_backend
+
+    seen_kwargs = {}
+
+    try:
+        usb_transport = _install_fake_pyusb([dev], {id(dev): "000J4G980818"})
+        sys.modules["libusb_package"] = fake_libusb_package
+
+        real_find = sys.modules["usb.core"].find
+
+        def spy_find(**kwargs):
+            seen_kwargs.update(kwargs)
+            return real_find(**{k: v for k, v in kwargs.items() if k != "backend"})
+
+        sys.modules["usb.core"].find = spy_find
+
+        usb_transport.find_device()
+        assert seen_kwargs.get("backend") is fake_backend
+    finally:
+        sys.modules.pop("libusb_package", None)
+        _teardown_fake_pyusb()
+
+
+def test_find_device_falls_back_when_libusb_package_not_installed():
+    ep_out = _FakeEndpoint(ENDPOINT_OUT)
+    ep_in = _FakeEndpoint(ENDPOINT_IN, reply=b"\x00" * 32)
+    dev = _FakeDevice("000J4G980818", ep_out, ep_in)
+    try:
+        usb_transport = _install_fake_pyusb([dev], {id(dev): "000J4G980818"})
+        sys.modules.pop("libusb_package", None)
+        assert usb_transport._get_backend() is None
+        # find_device() should still work fine without a backend kwarg.
+        assert usb_transport.find_device() is dev
+    finally:
+        _teardown_fake_pyusb()
+
+
 def test_query_status_writes_request_and_returns_reply():
     ep_out = _FakeEndpoint(ENDPOINT_OUT)
     reply = bytes(range(32))

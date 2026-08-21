@@ -8,8 +8,9 @@ be reused for this) and decodes the printer's 32-byte status reply, which
 includes the loaded tape's width and type.
 
 Requires (only for this tool -- normal printing via CUPS is unaffected):
-    pip3 install pyusb
-    brew install libusb
+    pip3 install pyusb libusb-package
+(libusb-package bundles prebuilt libusb binaries, so Homebrew isn't
+required; `brew install libusb` also works if you have Homebrew.)
 
 Usage:
     python3 tools/check_media.py

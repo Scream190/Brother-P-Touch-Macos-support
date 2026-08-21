@@ -120,8 +120,9 @@ Brother label printer driver.
 - The PT-P710BT connected via USB (recommended) and/or paired over
   Bluetooth (experimental, System Settings > Bluetooth).
 - Optional, only for `tools/check_media.py` (auto media-width detection —
-  see below): `pip3 install pyusb` and `brew install libusb`. Not needed
-  for printing itself.
+  see below): `pip3 install pyusb libusb-package`. `libusb-package` bundles
+  prebuilt libusb binaries, so Homebrew isn't required. Not needed for
+  printing itself.
 
 ## Install
 
@@ -259,6 +260,7 @@ USB device directly via `pyusb`/`libusb` instead). It requires the extra
 `pyusb`/`libusb` install from Requirements above; nothing else does.
 
 ```sh
+pip3 install pyusb libusb-package   # libusb-package needs no Homebrew
 python3 tools/check_media.py
 # or, with more than one Brother USB device attached:
 python3 tools/check_media.py --serial 000J4G980818

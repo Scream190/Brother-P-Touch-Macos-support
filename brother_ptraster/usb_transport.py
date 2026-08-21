@@ -54,10 +54,26 @@ def _require_pyusb():
         raise UsbTransportError(
             "pyusb is required for direct USB status queries (not needed for "
             "normal printing). Install it with:\n"
-            "    pip3 install pyusb\n"
-            "    brew install libusb\n"
+            "    pip3 install pyusb libusb-package\n"
         ) from exc
     return usb.core, usb.util
+
+
+def _get_backend():
+    """Return a pyusb backend from the ``libusb-package`` wheel if it's
+    installed, or None to fall back to pyusb's own auto-discovery (which
+    needs a system libusb, e.g. via Homebrew's ``libusb`` formula).
+
+    ``libusb-package`` bundles prebuilt libusb binaries for macOS/Windows/
+    Linux, so it works without Homebrew at all -- useful since not every
+    Mac has Homebrew installed (confirmed on real hardware: ``brew`` was
+    missing, and pyusb alone can't find a libusb without either it).
+    """
+    try:
+        import libusb_package
+    except ImportError:
+        return None
+    return libusb_package.get_libusb1_backend()
 
 
 def find_device(serial: Optional[str] = None):
@@ -67,8 +83,25 @@ def find_device(serial: Optional[str] = None):
     found and ``serial`` doesn't narrow it down to exactly one.
     """
     core, util = _require_pyusb()
+    backend = _get_backend()
 
-    devices = list(core.find(idVendor=BROTHER_VENDOR_ID, find_all=True))
+    find_kwargs = {"idVendor": BROTHER_VENDOR_ID, "find_all": True}
+    if backend is not None:
+        find_kwargs["backend"] = backend
+
+    try:
+        devices = list(core.find(**find_kwargs))
+    except ValueError as exc:
+        # pyusb raises this (not USBError) when it can't locate ANY libusb
+        # backend at all -- distinct from "found libusb but no matching
+        # device", which returns an empty list instead of raising.
+        raise UsbTransportError(
+            f"pyusb could not find a libusb backend ({exc}). Install one "
+            f"of:\n"
+            f"    pip3 install libusb-package   # no Homebrew needed\n"
+            f"    brew install libusb\n"
+        ) from exc
+
     if not devices:
         raise UsbTransportError(
             "no Brother USB device found (USB vendor 0x04f9) -- is the "
