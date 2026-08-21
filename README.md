@@ -60,17 +60,22 @@ fixes beyond the initial implementation:
 All fixed and covered by regression tests.
 
 **Leading cleanup (every job starts with its own feed+cut cycle) is
-experimental and risky.** An earlier implementation that concatenated the
-0-line cleanup segment and the real job into one transmission was
-confirmed to hang the printer/USB connection badly enough that only a
-full Mac restart recovered it (power-cycling the printer or replugging
-the cable did not). It's since been redesigned as two fully separate
-transmissions with a pause in between (`RasterJobBuilder.
-build_cleanup_segment()` + `build()`, sent independently -- see
-`tools/test_print.py --leading-cleanup`), but this has NOT yet been
-confirmed safe on real hardware under the new design. Still off by
-default; the CUPS filter doesn't use it. Test with a short throwaway job
-first, and be ready for another restart if it locks up again.
+experimental and risky.** Two implementations have hung the printer/USB
+connection on real hardware so far:
+1. concatenating a 0-line cleanup segment and the real job into one
+   transmission (needed a full Mac restart to recover)
+2. the same 0-line segment sent as a genuinely separate transmission with
+   a pause before the real job (recovered with just an unplug/replug that
+   time, but still hung)
+
+Since changing the transmission framing between attempts didn't help, the
+working hypothesis is that a content-free (`raster_count=0`) job
+specifically confuses the firmware, not how it's sent. The current
+variant (`RasterJobBuilder.build_cleanup_segment()`) sends real blank
+raster lines instead of declaring 0, to test that -- **still unconfirmed
+on real hardware.** Off by default; the CUPS filter doesn't use it. Test
+with `tools/test_print.py --leading-cleanup` and a short throwaway job
+first, and be ready for another hang.
 
 ## How it works
 

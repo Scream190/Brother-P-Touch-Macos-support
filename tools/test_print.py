@@ -180,7 +180,8 @@ def main() -> int:
     parser.add_argument("--feed-margin-mm", type=float, default=25.0, help="trailing feed before the cut, in mm (default 25; raise this if the printed area doesn't fully eject/get cut)")
     parser.add_argument("--invert", action="store_true", help="flip pixel polarity (try this if feed/cut work but nothing visibly prints)")
     parser.add_argument("--trailing-invalidate", action="store_true", help="append a second Invalidate+Initialize after the job (try this if the printer only cuts when the NEXT job starts, not at the end of the current one)")
-    parser.add_argument("--leading-cleanup", action="store_true", help="DANGER: sends a 0-line feed+cut segment as its OWN separate transmission before the real job (see brother_ptraster.protocol for why it must not be concatenated into one transmission -- an earlier version that did was confirmed on real hardware to hang the printer/USB connection, requiring a full Mac restart). Still risky even redesigned this way; test with a short throwaway job first and be ready for another restart.")
+    parser.add_argument("--leading-cleanup", action="store_true", help="DANGER: sends a blank-lines feed+cut segment as its OWN separate transmission before the real job. Two earlier variants (both declaring 0 raster lines -- one concatenated in-band, one sent separately) hung the printer/USB connection on real hardware; this one sends real blank raster lines instead, to test whether raster_count=0 specifically was the trigger. STILL UNCONFIRMED. Test with a short throwaway job first and be ready for a hang (unplug/replug or a full restart).")
+    parser.add_argument("--cleanup-blank-lines", type=int, default=20, help="number of blank raster lines in the leading cleanup segment (only with --leading-cleanup); avoids declaring a 0-line job, see --leading-cleanup")
     parser.add_argument("--cleanup-pause-s", type=float, default=1.5, help="seconds to wait after the cleanup segment finishes sending before sending the real job (only with --leading-cleanup); gives the feed+cut motion time to physically finish")
     parser.add_argument("--mode-byte", type=lambda s: int(s, 0), default=None, help="raw override for the 'various mode settings' (ESC i M) byte, e.g. 0x40 or 0x48 -- bypasses --no-cut")
     parser.add_argument("--advanced-byte", type=lambda s: int(s, 0), default=None, help="raw override for the 'advanced mode settings' (ESC i K) byte, e.g. 0x08 -- for testing candidate 'no chain printing' bits")
@@ -207,7 +208,7 @@ def main() -> int:
     )
     builder.add_lines(lines)
     data = builder.build()
-    cleanup_data = builder.build_cleanup_segment() if args.leading_cleanup else None
+    cleanup_data = builder.build_cleanup_segment(blank_lines=args.cleanup_blank_lines) if args.leading_cleanup else None
 
     print(f"Pattern: {args.pattern}  Media: {media.name} ({media.print_dots} dots, "
           f"{media.print_bytes} bytes/line)  Lines: {len(lines)}  Job size: {len(data)} bytes"

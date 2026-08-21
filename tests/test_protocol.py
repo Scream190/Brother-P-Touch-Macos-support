@@ -124,20 +124,23 @@ def test_build_never_bakes_in_the_cleanup_segment():
     assert with_data == without_data
 
 
-def test_build_cleanup_segment_is_a_complete_zero_line_segment():
+def test_build_cleanup_segment_uses_real_blank_lines_not_a_zero_count():
+    # Two variants declaring raster_count=0 both hung the printer on real
+    # hardware (see __init__/build_cleanup_segment docstrings) -- this
+    # variant must never declare 0, to test the hypothesis that 0 itself
+    # is what the firmware chokes on.
     media = get_media("12mm")
     builder = RasterJobBuilder(media)
     builder.add_line(b"\x00" * media.print_bytes)  # should not affect the cleanup segment
-    cleanup_segment = builder.build_cleanup_segment()
+    cleanup_segment = builder.build_cleanup_segment(blank_lines=5)
 
     assert cleanup_segment[:200] == b"\x00" * 200
     assert cleanup_segment[200:202] == bytes([ESC, 0x40])
     assert cleanup_segment.endswith(b"\x1a")
-    # 0 raster lines declared, and no 'G' commands at all.
     pic_start = 206
     raster_count = int.from_bytes(cleanup_segment[pic_start + 7 : pic_start + 11], "little")
-    assert raster_count == 0
-    assert b"\x47" not in cleanup_segment[pic_start + 11 :]
+    assert raster_count == 5
+    assert cleanup_segment.count(b"\x47") == 5  # one 'G' command per blank line
 
 
 def test_mode_and_advanced_byte_overrides():
