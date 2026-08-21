@@ -266,9 +266,17 @@ python3 tools/check_media.py
 python3 tools/check_media.py --serial 000J4G980818
 ```
 
-It prints the decoded status (media width/type, errors) and, if the width
-matches one of this driver's supported presets, the `-o media=...` value to
-pass to `lp`.
+It prints the decoded status (media width/type, tape/text color, errors)
+and, if the width matches one of this driver's supported presets, the
+`-o media=...` value to pass to `lp`.
+
+**Tape/text color is not hardware-confirmed yet** (unlike width, which was
+tested and matched exactly) — the byte offsets/value tables come from the
+generally-documented Brother status packet layout used across their QL/PT
+printer family, but haven't been checked against this unit. If the color
+`check_media.py` reports doesn't match your tape's actual color, say so
+(and ideally what the actual color is) so `brother_ptraster/status.py`'s
+`TAPE_COLORS`/`TEXT_COLORS` tables can be corrected.
 
 **Not yet wired into printing itself** — it's a manual check you run
 before printing, the same way you'd use Brother's own software's button.
