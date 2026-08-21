@@ -133,6 +133,7 @@ class StatusPacket:
             lines.append("ERRORS: " + ", ".join(self.errors))
         else:
             lines.append("errors: none reported")
+        lines.append(f"raw: {self.raw.hex()}")
         return "\n".join(lines)
 
 
