@@ -180,7 +180,8 @@ def main() -> int:
     parser.add_argument("--feed-margin-mm", type=float, default=25.0, help="trailing feed before the cut, in mm (default 25; raise this if the printed area doesn't fully eject/get cut)")
     parser.add_argument("--invert", action="store_true", help="flip pixel polarity (try this if feed/cut work but nothing visibly prints)")
     parser.add_argument("--trailing-invalidate", action="store_true", help="append a second Invalidate+Initialize after the job (try this if the printer only cuts when the NEXT job starts, not at the end of the current one)")
-    parser.add_argument("--leading-cleanup", action="store_true", help="DANGER: confirmed on real hardware to hang the printer/USB connection, requiring a full Mac restart to recover. Off by default; only pass this for careful, incremental re-testing of that specific bug, expecting to need a restart afterward.")
+    parser.add_argument("--leading-cleanup", action="store_true", help="DANGER: sends a 0-line feed+cut segment as its OWN separate transmission before the real job (see brother_ptraster.protocol for why it must not be concatenated into one transmission -- an earlier version that did was confirmed on real hardware to hang the printer/USB connection, requiring a full Mac restart). Still risky even redesigned this way; test with a short throwaway job first and be ready for another restart.")
+    parser.add_argument("--cleanup-pause-s", type=float, default=1.5, help="seconds to wait after the cleanup segment finishes sending before sending the real job (only with --leading-cleanup); gives the feed+cut motion time to physically finish")
     parser.add_argument("--mode-byte", type=lambda s: int(s, 0), default=None, help="raw override for the 'various mode settings' (ESC i M) byte, e.g. 0x40 or 0x48 -- bypasses --no-cut")
     parser.add_argument("--advanced-byte", type=lambda s: int(s, 0), default=None, help="raw override for the 'advanced mode settings' (ESC i K) byte, e.g. 0x08 -- for testing candidate 'no chain printing' bits")
     parser.add_argument("--usb-uri", help="USB device URI from 'sudo lpinfo -v', e.g. usb://Brother/PT-P710BT?serial=XXXX (recommended transport; needs sudo)")
@@ -206,10 +207,12 @@ def main() -> int:
     )
     builder.add_lines(lines)
     data = builder.build()
+    cleanup_data = builder.build_cleanup_segment() if args.leading_cleanup else None
 
     print(f"Pattern: {args.pattern}  Media: {media.name} ({media.print_dots} dots, "
           f"{media.print_bytes} bytes/line)  Lines: {len(lines)}  Job size: {len(data)} bytes"
-          f"{'  [INVERTED]' if args.invert else ''}")
+          f"{'  [INVERTED]' if args.invert else ''}"
+          f"{f'  [+{len(cleanup_data)}-byte leading cleanup segment, sent separately]' if cleanup_data else ''}")
 
     if args.verbose:
         print(f"  invalidate+init+raster-mode preamble: {data[:206].hex()}")
@@ -226,29 +229,43 @@ def main() -> int:
         with open(args.out, "wb") as f:
             f.write(data)
         print(f"Wrote {len(data)} bytes to {args.out}")
+        if cleanup_data:
+            cleanup_out = args.out + ".cleanup"
+            with open(cleanup_out, "wb") as f:
+                f.write(cleanup_data)
+            print(f"Wrote {len(cleanup_data)}-byte cleanup segment to {cleanup_out} "
+                  f"(sent as its own transmission BEFORE {args.out}, not concatenated)")
 
     if args.dry_run:
         print("--dry-run set: not sending anything to a printer.")
         return 0
 
     if args.usb_uri:
-        print(f"Sending to {args.usb_uri} via the system usb backend...")
-        send_via_usb(args.usb_uri, data, args.verbose)
-        print("Sent. Check the printer.")
-        return 0
+        def send(chunk: bytes) -> None:
+            send_via_usb(args.usb_uri, chunk, args.verbose)
+    elif args.device_path or args.device:
+        device_path = args.device_path or f"/dev/cu.{args.device}"
 
-    if args.device_path:
-        device_path = args.device_path
-    elif args.device:
-        device_path = f"/dev/cu.{args.device}"
+        def send(chunk: bytes) -> None:
+            send_to_device(device_path, chunk, args.verbose)
     else:
         raise SystemExit(
             "Specify --usb-uri (recommended, see 'sudo lpinfo -v'), or "
             "--device/--device-path for Bluetooth, or pass --dry-run."
         )
 
-    print(f"Sending to {device_path} ...")
-    send_to_device(device_path, data, args.verbose)
+    if cleanup_data:
+        # Two FULLY SEPARATE transmissions (each its own connect/write/
+        # disconnect), not concatenated bytes -- see protocol.py's
+        # leading_cleanup docs for why that distinction matters here.
+        print(f"Sending {len(cleanup_data)}-byte cleanup segment (feed+cut, no content) "
+              f"as a separate transmission...")
+        send(cleanup_data)
+        print(f"Sent. Waiting {args.cleanup_pause_s}s for the feed+cut to physically finish...")
+        time.sleep(args.cleanup_pause_s)
+
+    print(f"Sending {len(data)}-byte job...")
+    send(data)
     print("Sent. Check the printer.")
     return 0
 

@@ -106,7 +106,12 @@ def test_leading_cleanup_defaults_off():
     assert RasterJobBuilder(media).leading_cleanup is False
 
 
-def test_leading_cleanup_prepends_a_zero_line_segment_when_enabled():
+def test_build_never_bakes_in_the_cleanup_segment():
+    # A same-transmission "0-line segment + real segment" concatenation was
+    # confirmed on real hardware to hang the printer/USB connection -- see
+    # __init__. build() must never do that itself, regardless of
+    # leading_cleanup; callers send build_cleanup_segment() as a fully
+    # separate transmission instead (see tools/test_print.py).
     media = get_media("12mm")
     with_cleanup = RasterJobBuilder(media, leading_cleanup=True)
     with_cleanup.add_line(b"\x00" * media.print_bytes)
@@ -116,13 +121,15 @@ def test_leading_cleanup_prepends_a_zero_line_segment_when_enabled():
     without_cleanup.add_line(b"\x00" * media.print_bytes)
     without_data = without_cleanup.build()
 
-    # The cleanup segment is a full, independent segment (same framing as
-    # a real one, just declaring 0 raster lines) prepended before the real
-    # job's own segment, which should appear unchanged right after it.
-    assert with_data.endswith(without_data)
-    assert len(with_data) > len(without_data)
+    assert with_data == without_data
 
-    cleanup_segment = with_data[: len(with_data) - len(without_data)]
+
+def test_build_cleanup_segment_is_a_complete_zero_line_segment():
+    media = get_media("12mm")
+    builder = RasterJobBuilder(media)
+    builder.add_line(b"\x00" * media.print_bytes)  # should not affect the cleanup segment
+    cleanup_segment = builder.build_cleanup_segment()
+
     assert cleanup_segment[:200] == b"\x00" * 200
     assert cleanup_segment[200:202] == bytes([ESC, 0x40])
     assert cleanup_segment.endswith(b"\x1a")

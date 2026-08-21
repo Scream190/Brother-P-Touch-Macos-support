@@ -59,12 +59,18 @@ fixes beyond the initial implementation:
 
 All fixed and covered by regression tests.
 
-**Do not re-enable `RasterJobBuilder(leading_cleanup=True)`** (an attempt
-at making every job start with its own feed+cut cycle) without very
-cautious, incremental hardware testing: it's confirmed to hang the
-printer/USB connection badly enough that only a full Mac restart recovers
-it, not power-cycling the printer or replugging the cable. It defaults to
-`False` and the CUPS filter doesn't touch that parameter.
+**Leading cleanup (every job starts with its own feed+cut cycle) is
+experimental and risky.** An earlier implementation that concatenated the
+0-line cleanup segment and the real job into one transmission was
+confirmed to hang the printer/USB connection badly enough that only a
+full Mac restart recovered it (power-cycling the printer or replugging
+the cable did not). It's since been redesigned as two fully separate
+transmissions with a pause in between (`RasterJobBuilder.
+build_cleanup_segment()` + `build()`, sent independently -- see
+`tools/test_print.py --leading-cleanup`), but this has NOT yet been
+confirmed safe on real hardware under the new design. Still off by
+default; the CUPS filter doesn't use it. Test with a short throwaway job
+first, and be ready for another restart if it locks up again.
 
 ## How it works
 
