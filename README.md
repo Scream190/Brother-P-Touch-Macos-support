@@ -119,6 +119,9 @@ Brother label printer driver.
   everything here uses only the standard library).
 - The PT-P710BT connected via USB (recommended) and/or paired over
   Bluetooth (experimental, System Settings > Bluetooth).
+- Optional, only for `tools/check_media.py` (auto media-width detection —
+  see below): `pip3 install pyusb` and `brew install libusb`. Not needed
+  for printing itself.
 
 ## Install
 
@@ -242,6 +245,40 @@ raster parsing/filter chain is also correct.
 - **Cut Each Label** toggles auto-cut after each label.
 - From the command line: `lp -d PT-P710BT -o media=mm12 file.pdf`.
 
+## Checking the loaded media (auto-detection)
+
+Like the "check media" button in Brother's own P-touch software,
+`tools/check_media.py` queries the printer directly and reports what tape
+is actually loaded right now (width, type, and any errors like "cover
+open" or "no media"), so you don't have to guess or remember what's in it.
+
+This is a standalone tool, separate from the CUPS print path — it needs to
+*read* the printer's reply, which the normal CUPS `usb` backend doesn't
+support (see `brother_ptraster/usb_transport.py` for why: it talks to the
+USB device directly via `pyusb`/`libusb` instead). It requires the extra
+`pyusb`/`libusb` install from Requirements above; nothing else does.
+
+```sh
+python3 tools/check_media.py
+# or, with more than one Brother USB device attached:
+python3 tools/check_media.py --serial 000J4G980818
+```
+
+It prints the decoded status (media width/type, errors) and, if the width
+matches one of this driver's supported presets, the `-o media=...` value to
+pass to `lp`.
+
+**Not yet wired into printing itself** — it's a manual check you run
+before printing, the same way you'd use Brother's own software's button.
+Automatically detecting media as part of every print job (skipping the
+Tape Width picker, refusing to print on a width mismatch, etc.) is a
+possible follow-up, not implemented here yet.
+
+If it fails with a "busy"/"access" error: something else (a stale print
+job, or macOS's own generic USB-printing support) currently holds the USB
+interface open. Try unplugging and replugging the printer immediately
+before running the query, with no print job in progress.
+
 ## Known limitations
 
 - **Bluetooth confirmed non-functional on at least one unit.** macOS
@@ -254,10 +291,13 @@ raster parsing/filter chain is also correct.
   cassettes aren't specifically modeled (they'd need their own PPD entries
   with fixed label lengths and gap-detection behavior, which this project
   doesn't attempt).
-- **No status feedback**: the backend doesn't read the printer's status
-  responses (e.g. "out of tape", "cover open"), so such errors won't be
-  reported back into macOS's print queue — check the printer itself if a
-  job seems to vanish without printing.
+- **No status feedback during printing**: the CUPS backend itself doesn't
+  read the printer's status responses (e.g. "out of tape", "cover open"),
+  so such errors won't be reported back into macOS's print queue — check
+  the printer itself if a job seems to vanish without printing. You *can*
+  query status manually, separately from printing, with
+  `tools/check_media.py` (see "Checking the loaded media" above) — it's
+  just not wired into the print path yet.
 - **Uncompressed raster only**: the CUPS raster reader
   (`brother_ptraster/cups_raster.py`) doesn't implement CUPS's row
   compression, which is fine for the standard `cupsFilter2` chain this PPD
@@ -274,6 +314,9 @@ brother_ptraster/       Protocol library (no CUPS/macOS dependency; unit-testabl
   media.py               Tape width table, print-head geometry
   protocol.py             Brother raster-mode command encoder
   cups_raster.py          Minimal CUPS Raster page-stream reader
+  orient.py                Raster page rotate/mirror transforms
+  status.py                Decoder for the printer's 32-byte status packet
+  usb_transport.py         Direct (bidirectional) USB transport, for status queries only
   patterns.py              Test patterns (ruler/diagonal/etc.) for hardware bring-up
 filter/rastertoptp710bt   CUPS filter entrypoint
 backend/ptp710bt          CUPS backend entrypoint (Bluetooth SPP transport, experimental)
@@ -281,6 +324,8 @@ ppd/Brother_PT-P710BT.ppd PPD describing the printer to CUPS/macOS
 install/                  install.sh / uninstall.sh
 tools/list_bt_serial_ports.py  Helper to find the paired Bluetooth device's /dev/cu.* name
 tools/test_print.py       Standalone hardware test tool (bypasses CUPS; supports USB and Bluetooth)
+tools/check_media.py      Standalone "check media" tool (queries loaded tape over direct USB)
+tools/decode_status.py    Decode a hex-dumped 32-byte status packet by hand
 tests/                    Unit tests (no hardware required)
 ```
 

@@ -10,7 +10,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from brother_ptraster.media import get_media, nearest_media, HEAD_PINS, BYTES_PER_LINE
-from brother_ptraster.protocol import RasterJobBuilder, pack_bitmap_row, ESC
+from brother_ptraster.protocol import RasterJobBuilder, build_status_request, pack_bitmap_row, ESC
 
 
 def test_media_table_widths_are_centered_within_head():
@@ -234,6 +234,14 @@ def test_invert_flips_only_the_raster_line_bytes():
 def test_pack_bitmap_row():
     packed = pack_bitmap_row([1, 0, 1, 1, 0, 0, 0, 0, 1], n_bytes=2)
     assert packed == bytes([0b10110000, 0b10000000])
+
+
+def test_build_status_request_is_invalidate_initialize_then_status_query():
+    data = build_status_request()
+    assert data[:200] == b"\x00" * 200
+    assert data[200:202] == bytes([ESC, 0x40])  # Initialize
+    assert data[202:205] == bytes([ESC, 0x69, 0x53])  # ESC i S
+    assert len(data) == 205
 
 
 def test_multiple_lines_produce_multiple_g_commands():

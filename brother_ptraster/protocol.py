@@ -257,6 +257,21 @@ class RasterJobBuilder:
         return bytes(out)
 
 
+def build_status_request() -> bytes:
+    """Invalidate + Initialize + Status Information Request (ESC i S).
+
+    Clears any partial command sequence left in the printer's receive
+    buffer first (same first two steps as a real print job), then asks it
+    to reply with its current 32-byte status packet (see
+    brother_ptraster/status.py) -- includes the currently loaded media's
+    width and type. Used by tools/check_media.py for "check media"-style
+    auto-detection, sent over a direct USB connection (see
+    brother_ptraster/usb_transport.py) since this needs to read the
+    printer's reply, which the normal CUPS print path doesn't do.
+    """
+    return b"\x00" * 200 + bytes([ESC, 0x40]) + bytes([ESC, 0x69, 0x53])
+
+
 def pack_bitmap_row(pixels: Iterable[int], n_bytes: int) -> bytes:
     """Pack an iterable of 0/1 pixel values (MSB-first) into ``n_bytes``."""
     buf = bytearray(n_bytes)
