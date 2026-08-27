@@ -96,6 +96,50 @@ def test_print_information_command_encodes_line_count():
     assert raster_count == 5
 
 
+def test_leading_margin_defaults_to_no_extra_lines():
+    media = get_media("12mm")
+    with_default = RasterJobBuilder(media, leading_cleanup=False)
+    with_default.add_line(b"\x00" * media.print_bytes)
+    without_leading_margin = RasterJobBuilder(media, leading_margin_mm=0.0, leading_cleanup=False)
+    without_leading_margin.add_line(b"\x00" * media.print_bytes)
+    assert with_default.build() == without_leading_margin.build()
+
+
+def test_leading_margin_prepends_blank_lines_within_the_same_segment():
+    # 24mm media uses the full 128-pin head (pin_offset=0, print_bytes ==
+    # BYTES_PER_LINE), so a content line survives head-padding unchanged
+    # -- keeps this test's byte comparisons exact and simple.
+    media = get_media("24mm")
+    plain = RasterJobBuilder(media, leading_cleanup=False)
+    plain.add_line(b"\xff" * media.print_bytes)
+    plain_data = plain.build()
+
+    with_margin = RasterJobBuilder(media, leading_margin_mm=25.4, leading_cleanup=False)  # 1 inch = 180 dots
+    with_margin.add_line(b"\xff" * media.print_bytes)
+    margin_data = with_margin.build()
+
+    # Same single segment (one Invalidate/Initialize preamble), not a
+    # second job -- just a bigger declared raster_count and more 'G'
+    # commands before the real content's.
+    assert margin_data[:200] == b"\x00" * 200
+    assert margin_data.count(b"\x00" * 200) == 1
+
+    pic_start = 206
+    plain_count = int.from_bytes(plain_data[pic_start + 7 : pic_start + 11], "little")
+    margin_count = int.from_bytes(margin_data[pic_start + 7 : pic_start + 11], "little")
+    assert margin_count == plain_count + 180
+
+    preamble_len = 200 + 2 + 4 + 13 + 4 + 4 + 5 + 2
+    # The first 180 'G' commands are blank (all-zero payload); the 181st
+    # is the real all-ones content line.
+    g_len = 3 + BYTES_PER_LINE
+    first_payload = margin_data[preamble_len + 3 : preamble_len + 3 + BYTES_PER_LINE]
+    assert first_payload == b"\x00" * BYTES_PER_LINE
+    content_offset = preamble_len + 180 * g_len
+    content_payload = margin_data[content_offset + 3 : content_offset + 3 + BYTES_PER_LINE]
+    assert content_payload == b"\xff" * BYTES_PER_LINE
+
+
 def test_job_ends_with_print_and_feed():
     media = get_media("12mm")
     builder = RasterJobBuilder(media)

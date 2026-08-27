@@ -74,6 +74,17 @@ fixes beyond the initial implementation:
 
 All fixed and covered by regression tests.
 
+**Self-centered labels:** the filter adds a leading blank of the same
+size as the trailing margin (5mm each by default,
+`filter/rastertoptp710bt`'s `DEFAULT_MARGIN_MM`) before the content, so
+every label comes out symmetric regardless of print history. Without
+this, the leading blank was purely accidental -- whatever the *previous*
+job's own trailing margin happened to leave attached at its cut point --
+confirmed on real hardware to be visibly off-center (~10mm leading vs
+~5mm trailing on one test where only the trailing margin was set). This
+is real (blank) content within the same job/transmission, not the
+abandoned `leading_cleanup` -- see `RasterJobBuilder.leading_margin_mm`.
+
 **Minimum label length:** the printer enforces a minimum total length per
 label (content + trailing margin) of roughly 24mm -- asking for less just
 makes it pad the difference with extra blank feed before the cut, rather

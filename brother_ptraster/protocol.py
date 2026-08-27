@@ -70,6 +70,7 @@ class RasterJobBuilder:
         high_resolution: bool = False,
         invert: bool = False,
         feed_margin_mm: float = 5.0,
+        leading_margin_mm: float = 0.0,
         trailing_invalidate: bool = False,
         mode_byte: "int | None" = None,
         advanced_byte: "int | None" = None,
@@ -122,6 +123,21 @@ class RasterJobBuilder:
         # shrinking the label, so this margin's effect is only fully
         # visible once content + margin exceeds that floor.
         self.feed_margin_dots = round(feed_margin_mm / 25.4 * DPI)
+        # Blank raster lines prepended before the real content, WITHIN
+        # this same job segment -- not a separate job, not a separate
+        # transmission, nothing like the abandoned leading_cleanup below.
+        # It's exactly the same kind of thing any print job already does
+        # (blank 'G' lines mixed with content ones), just placed first.
+        # Without this, the blank tape before a label's content is purely
+        # accidental: it's whatever the PREVIOUS job's own feed_margin_mm
+        # happened to leave attached at its cut point -- unpredictable,
+        # and not necessarily equal to feed_margin_mm on either side.
+        # Confirmed on real hardware: a print with only a trailing margin
+        # showed ~10mm of leading blank (inherited from an earlier job's
+        # larger margin) against ~5mm trailing -- visibly off-center.
+        # Setting this equal to feed_margin_mm makes the blank space
+        # symmetric around the content, independent of print history.
+        self.leading_margin_dots = round(leading_margin_mm / 25.4 * DPI)
         # ABANDONED -- default OFF, do not re-enable. Three structurally
         # different implementations were tried on real hardware, all
         # failed:
@@ -283,7 +299,9 @@ class RasterJobBuilder:
     def build(self) -> bytes:
         out = bytearray()
 
-        out += self._build_segment(self._lines)
+        blank_line = bytes(BYTES_PER_LINE)
+        lines = [blank_line] * self.leading_margin_dots + self._lines
+        out += self._build_segment(lines)
 
         if self.trailing_invalidate:
             out += b"\x00" * 200

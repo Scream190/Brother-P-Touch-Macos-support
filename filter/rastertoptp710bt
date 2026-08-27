@@ -43,6 +43,11 @@ from brother_ptraster.protocol import RasterJobBuilder
 # PPD *ImageRotate choice names -> degrees clockwise.
 ROTATE_CHOICES = {"None": 0, "Rotate90": 90, "Rotate180": 180, "Rotate270": 270}
 
+# Trailing feed before the cut, and leading blank before the content --
+# kept equal so every label comes out self-centered (see the call site
+# for why). Confirmed on real hardware (see RasterJobBuilder.__init__).
+DEFAULT_MARGIN_MM = 5.0
+
 
 def log(level: str, message: str) -> None:
     sys.stderr.write(f"{level}: [rastertoptp710bt] {message}\n")
@@ -173,7 +178,20 @@ def main() -> int:
                 log("ERROR", f"page {page_num}: {exc}")
                 return 1
 
-            builder = RasterJobBuilder(media, auto_cut=auto_cut)
+            # Symmetric leading/trailing blank around the content: without
+            # an explicit leading_margin_mm, the blank tape before a label
+            # is purely accidental (whatever the PREVIOUS job's own margin
+            # happened to leave attached at its cut point) -- confirmed on
+            # real hardware to be visibly off-center (~10mm leading vs
+            # ~5mm trailing on one test). Matching it to the trailing
+            # margin makes every label self-centered regardless of print
+            # history. See RasterJobBuilder.leading_margin_mm.
+            builder = RasterJobBuilder(
+                media,
+                auto_cut=auto_cut,
+                feed_margin_mm=DEFAULT_MARGIN_MM,
+                leading_margin_mm=DEFAULT_MARGIN_MM,
+            )
             for row in rows:
                 if len(row) >= media.print_bytes:
                     line = row[: media.print_bytes]

@@ -178,6 +178,7 @@ def main() -> int:
     parser.add_argument("--length", type=int, default=200, help="label length in dots (180 dots ~= 25.4mm at 180dpi)")
     parser.add_argument("--no-cut", action="store_true", help="disable auto-cut after printing")
     parser.add_argument("--feed-margin-mm", type=float, default=5.0, help="trailing feed before the cut, in mm (default 5, confirmed on real hardware to fully eject/cut cleanly; raise this if the printed area doesn't fully eject/get cut on your unit)")
+    parser.add_argument("--leading-margin-mm", type=float, default=0.0, help="blank raster lines before the content, in mm (default 0). Set equal to --feed-margin-mm for a self-centered label regardless of print history -- see RasterJobBuilder.leading_margin_mm. This is real blank content within the SAME job, not the abandoned leading_cleanup.")
     parser.add_argument("--invert", action="store_true", help="flip pixel polarity (try this if feed/cut work but nothing visibly prints)")
     parser.add_argument("--trailing-invalidate", action="store_true", help="append a second Invalidate+Initialize after the job (try this if the printer only cuts when the NEXT job starts, not at the end of the current one)")
     parser.add_argument("--leading-cleanup", action="store_true", help="ABANDONED: sends a blank-lines feed+cut segment as its OWN separate transmission before the real job. Three variants tried on real hardware, all failed: two 0-line variants hung the printer/USB connection; this blank-lines variant doesn't hang but puts the printer into an error state (blinking red LED) without feeding/cutting. Kept only for further experimentation, not a working feature -- see brother_ptraster.protocol.RasterJobBuilder.leading_cleanup.")
@@ -201,6 +202,7 @@ def main() -> int:
         auto_cut=not args.no_cut,
         invert=args.invert,
         feed_margin_mm=args.feed_margin_mm,
+        leading_margin_mm=args.leading_margin_mm,
         trailing_invalidate=args.trailing_invalidate,
         mode_byte=args.mode_byte,
         advanced_byte=args.advanced_byte,
