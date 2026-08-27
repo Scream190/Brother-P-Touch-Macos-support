@@ -103,6 +103,19 @@ def get_media(name: str) -> MediaSpec:
         raise ValueError(f"Unknown media {name!r}; valid options: {valid}") from exc
 
 
+def get_media_by_ppd_option(ppd_option: str) -> MediaSpec:
+    """Reverse lookup of ``MediaSpec.ppd_option`` (e.g. ``"mm12"``), for
+    tools that work with the same ``-o media=...`` value a CUPS job uses
+    rather than the display-oriented ``name`` (see ``ppd_option`` on
+    ``MediaSpec`` for why these differ).
+    """
+    for media in MEDIA_TABLE.values():
+        if media.ppd_option == ppd_option:
+            return media
+    valid = ", ".join(sorted(m.ppd_option for m in MEDIA_TABLE.values()))
+    raise ValueError(f"Unknown PPD media option {ppd_option!r}; valid options: {valid}")
+
+
 def nearest_media(width_mm: float, tolerance_mm: float = 1.5) -> MediaSpec:
     """Return the MediaSpec whose width is closest to ``width_mm``.
 

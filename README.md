@@ -273,13 +273,31 @@ raster parsing/filter chain is also correct.
 ## Printing
 
 - In the Print dialog, pick the **Tape Width** matching the cassette
-  currently loaded (3.5/6/9/12/18/24 mm). The filter reads the actual page
-  dimensions from the job to select the tape width, so this also works if
-  you define a custom paper size via "Manage Custom Sizes..." for a
-  specific label length — this PPD declares pages wide (Width = label
-  length, Height = tape width), so set the *height* to match your tape.
+  currently loaded (3.5/6/9/12/18/24 mm).
 - **Cut Each Label** toggles auto-cut after each label.
 - From the command line: `lp -d PT-P710BT -o media=mm12 file.pdf`.
+
+### Custom label length
+
+The 6 Tape Width presets each carry a fixed default length (~40mm) --
+that's just a convenient starting point, not a hard limit: continuous
+tape has no fixed length, and the filter prints however much content it
+actually receives, regardless of the preset's nominal size.
+
+To set your own length: **Paper Size → Manage Custom Sizes... → +** (in
+the Print dialog's paper size dropdown), then set **Width** to your
+desired label length and **Height** to match your loaded tape width --
+this PPD declares pages WIDE (Width = label length, Height = tape width),
+which is why it's Width you change here, not Height. Give it a name and
+click OK; it then shows up as a regular entry in the Paper Size list for
+this and future print jobs, without needing to redo this each time.
+
+There's no separate "automatic length" option: the driver doesn't
+truncate or pad based on the page size you picked, so a custom size just
+needs to be *long enough* for your content -- some extra blank space at
+the end simply becomes a slightly longer trailing margin, not wasted
+effort. There is a real hardware floor, though -- see "Minimum label
+length" above.
 
 ## Checking the loaded media (auto-detection)
 
@@ -313,11 +331,32 @@ printer family, but haven't been checked against this unit. If the color
 (and ideally what the actual color is) so `brother_ptraster/status.py`'s
 `TAPE_COLORS`/`TEXT_COLORS` tables can be corrected.
 
-**Not yet wired into printing itself** — it's a manual check you run
-before printing, the same way you'd use Brother's own software's button.
-Automatically detecting media as part of every print job (skipping the
-Tape Width picker, refusing to print on a width mismatch, etc.) is a
-possible follow-up, not implemented here yet.
+**Not wired into the CUPS print path itself, deliberately.** CUPS runs a
+job's filter and backend concurrently (piped together), and the backend
+often opens its USB connection before any data has even arrived --
+adding our own direct USB status query into that same window risked a
+conflict over the device. This printer's USB stack has shown itself
+prone to hangs/error states under much smaller provocations (see the
+leading_cleanup saga in git history), so this check intentionally stays
+completely separate from any real print job's own USB transmission.
+
+For a one-command "check, then print" workflow that keeps that
+separation, use `tools/print_with_check.py` instead of `lp` directly --
+it runs the same check as `check_media.py` to completion (fully closing
+that connection) and only afterwards, as a separate step, calls `lp`:
+
+```sh
+python3 tools/print_with_check.py --media mm12 label.pdf
+# skip the check (e.g. if pyusb/libusb isn't installed):
+python3 tools/print_with_check.py --media mm12 --skip-check label.pdf
+# pass extra CUPS options through to lp, and/or disambiguate by serial:
+python3 tools/print_with_check.py --media mm18 --serial 000J4G980818 \
+    --option AutoCut=False label.pdf
+```
+
+It refuses to print (before anything is sent to the printer at all) if
+the loaded tape's width doesn't match `--media`, telling you what's
+actually loaded instead.
 
 If it fails with a "busy"/"access" error: something else (a stale print
 job, or macOS's own generic USB-printing support) currently holds the USB
@@ -370,6 +409,7 @@ install/                  install.sh / uninstall.sh
 tools/list_bt_serial_ports.py  Helper to find the paired Bluetooth device's /dev/cu.* name
 tools/test_print.py       Standalone hardware test tool (bypasses CUPS; supports USB and Bluetooth)
 tools/check_media.py      Standalone "check media" tool (queries loaded tape over direct USB)
+tools/print_with_check.py Check media, then lp -- as two separate steps, never concurrent
 tools/decode_status.py    Decode a hex-dumped 32-byte status packet by hand
 tests/                    Unit tests (no hardware required)
 ```
