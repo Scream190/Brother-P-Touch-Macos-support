@@ -64,6 +64,13 @@ fixes beyond the initial implementation:
   print head's real alignment to the tape isn't perfectly centered on
   this unit. Fixed with a small, hardware-confirmed trim
   (`media.PIN_ALIGNMENT_TRIM_DOTS`)
+- the PPD's `*CustomPageSize True` PostScript snippet was missing the
+  standard `pop pop pop` prefix required by the CUPS custom-page-size
+  protocol (see cups' PPD spec) -- without it, any *Custom* page size
+  (as opposed to a named preset like mm12) got badly corrupted page
+  geometry, confirmed on real hardware as content coming out
+  scaled/positioned as if rotated. Named presets were never affected,
+  since they declare `PageSize` directly without this code path.
 
 All fixed and covered by regression tests.
 

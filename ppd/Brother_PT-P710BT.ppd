@@ -94,7 +94,18 @@
 *MaxMediaHeight: "68"
 *MinMediaHeight: "10"
 *HWMargins: 0 0 0 0
-*CustomPageSize True: "<</PageSize[5 -2 roll]/ImagingBBox null>>setpagedevice"
+*% Standard CUPS custom-page-size boilerplate (see cups/spec-ppd.html):
+*% the print system pushes Width Height WidthOffset HeightOffset
+*% Orientation onto the stack before running this code. The "pop pop
+*% pop" is NOT optional -- it discards WidthOffset/HeightOffset/
+*% Orientation before "[5 -2 roll]" reorders the remaining Width/Height
+*% into a valid PageSize array. Missing it (an earlier version of this
+*% PPD did) was confirmed on real hardware to badly corrupt the page
+*% geometry for any Custom size -- content came out scaled/positioned
+*% as if rotated -- while every named PageSize preset (mm12 etc.) was
+*% unaffected, since those declare PageSize directly without going
+*% through this code path at all.
+*CustomPageSize True: "pop pop pop <</PageSize[5 -2 roll]/ImagingBBox null>>setpagedevice"
 *ParamCustomPageSize Width: "1 points 20 5000"
 *ParamCustomPageSize Height: "2 points 10 68"
 *ParamCustomPageSize WidthOffset: "0 points 0 0"
