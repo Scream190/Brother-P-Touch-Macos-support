@@ -15,7 +15,7 @@ from brother_ptraster.protocol import RasterJobBuilder, build_status_request, pa
 
 def test_media_table_widths_are_centered_within_head():
     # "Centered" here allows for PIN_ALIGNMENT_TRIM_DOTS -- a small,
-    # real-hardware-motivated fine-tune shift off perfect centering (see
+    # real-hardware-CONFIRMED fine-tune shift off perfect centering (see
     # media.py) -- clamped so it never pushes the active area off either
     # edge of the head.
     for media in get_media("12mm"), get_media("24mm"), get_media("3.5mm"):

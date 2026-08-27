@@ -55,17 +55,14 @@ class MediaSpec:
 
 
 
-# Fine-tune constant for the assumed print head <-> tape alignment. Real
-# hardware test (12mm tape, full-width solid fill) found a small but
-# consistent asymmetry: ~0.5mm margin on one edge, ~0mm (right at the
-# edge) on the other -- meaning the printer's real head-to-tape alignment
-# is slightly off from perfectly centered, not centering-formula-wrong,
-# just a small mechanical/measurement offset. Positive shifts pin_offset
-# up (toward higher-numbered pins); the actual physical direction (which
-# edge that corresponds to) isn't known yet -- this value is a trial
-# guess, to be corrected based on whether the next real-hardware test
-# shows the asymmetry improve or worsen. 0 = no adjustment (previous
-# behavior).
+# Fine-tune constant for the print head <-> tape alignment. Real hardware
+# test (12mm tape, full-width solid fill) found a small but consistent
+# asymmetry with the plain 50/50 centering split: ~0.5mm margin on one
+# edge, ~0mm (right at the edge) on the other -- the printer's real
+# head-to-tape alignment is slightly off from perfectly centered, not a
+# centering-formula bug. CONFIRMED on real hardware via incremental
+# testing (2 dots visibly improved it, 3 dots looked perfect) -- positive
+# shifts pin_offset up, toward higher-numbered pins.
 PIN_ALIGNMENT_TRIM_DOTS = 3
 
 

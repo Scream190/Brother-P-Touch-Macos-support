@@ -56,8 +56,20 @@ fixes beyond the initial implementation:
   tape-width axis) and applies an additional confirmed-correct mirror on
   top (see the PPD's `*ImageRotate`/`*ImageMirror` options, still
   adjustable if you want the old vertical-reading orientation instead)
+- the print area was consistently off-center across the tape width by
+  about 0.5mm (~0mm margin on one edge, ~0.5mm on the other) -- the
+  print head's real alignment to the tape isn't perfectly centered on
+  this unit. Fixed with a small, hardware-confirmed trim
+  (`media.PIN_ALIGNMENT_TRIM_DOTS`)
 
 All fixed and covered by regression tests.
+
+**Minimum label length:** the printer enforces a minimum total length per
+label (content + trailing margin) of roughly 24mm -- asking for less just
+makes it pad the difference with extra blank feed before the cut, rather
+than actually printing a shorter label. Only matters for very short
+prints/labels; real-world content (logos, multi-line text, QR codes) is
+almost always longer than this already.
 
 **Leading cleanup (every job starting with its own feed+cut cycle) was
 tried and abandoned.** Three structurally different implementations were
