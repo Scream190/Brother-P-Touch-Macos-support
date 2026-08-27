@@ -66,7 +66,7 @@ class MediaSpec:
 # guess, to be corrected based on whether the next real-hardware test
 # shows the asymmetry improve or worsen. 0 = no adjustment (previous
 # behavior).
-PIN_ALIGNMENT_TRIM_DOTS = 2
+PIN_ALIGNMENT_TRIM_DOTS = 3
 
 
 def _centered(width_mm: float) -> MediaSpec:
