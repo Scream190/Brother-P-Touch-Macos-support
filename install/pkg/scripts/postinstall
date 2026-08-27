@@ -1,0 +1,7 @@
+#!/bin/bash
+# Runs as root, automatically, after macOS's Installer copies the driver
+# files into place (pkgbuild --scripts wires this up). Just needs cupsd to
+# notice the new/updated PPD and filter -- a full restart is the reliable
+# way to guarantee that (matches what install.sh does for the same reason).
+launchctl kickstart -k system/org.cups.cupsd 2>/dev/null || true
+exit 0

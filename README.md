@@ -179,6 +179,33 @@ Brother label printer driver.
 
 ## Install
 
+### Option A: double-click .pkg installer (no Terminal)
+
+```sh
+./install/pkg/build_pkg.sh
+```
+
+Run this once, on a Mac (it needs Apple's `pkgbuild`/`productbuild`, which
+ship with the Xcode Command Line Tools -- `xcode-select --install` if
+missing; this one step can't be skipped, since those tools only exist on
+macOS). It produces `Brother_PT-P710BT_Driver.pkg` in the repo root.
+
+From then on, installing (and reinstalling after a `git pull`) is just:
+double-click the `.pkg`, click through the standard macOS Installer (it
+prompts for your admin password itself, via its own window, not
+Terminal), then add the printer via **System Settings → Printers &
+Scanners → Add Printer** — no `lpadmin` needed, since the installed PPD
+shows up there by name ("Brother PT-P710BT") for you to pick, either
+picked up automatically for a connected USB printer or found via "Select
+Software...".
+
+It's unsigned (no paid Apple Developer ID certificate), so **the first
+time**, right-click it and choose **Open** instead of double-clicking —
+Gatekeeper otherwise silently blocks it. After that first approval it
+opens normally.
+
+### Option B: shell script
+
 ```sh
 sudo ./install/install.sh
 ```
@@ -200,9 +227,22 @@ being sealed (SIP/SSV) — only `/usr/share` is off-limits, and this driver
 doesn't need it (the filter is wired up via the PPD's `cupsFilter2` line,
 not the global `/usr/share/cups/mime.types`).
 
-To remove everything: `sudo ./install/uninstall.sh`.
+Both options install the same files (`install/pkg/build_pkg.sh` stages
+the same three files as Option B before handing them to `pkgbuild`), so
+everything below applies either way.
+
+To remove everything: `sudo ./install/uninstall.sh` (Terminal-based;
+there's no double-click uninstaller yet).
 
 ## Add the print queue (USB, recommended)
+
+**No Terminal needed:** connect the PT-P710BT via USB, power it on, then
+open **System Settings → Printers & Scanners → Add Printer (+)** and pick
+it from the list (or "Select Software..." and search "Brother PT-P710BT"
+if it isn't auto-detected). Skip to step 4 below.
+
+**Or via Terminal**, e.g. for scripting or to set options `lpadmin`
+supports that the GUI doesn't expose directly:
 
 1. Connect the PT-P710BT via USB and power it on.
 2. Find its USB device URI (needs sudo to see USB printers):
@@ -465,6 +505,7 @@ filter/rastertoptp710bt   CUPS filter entrypoint
 backend/ptp710bt          CUPS backend entrypoint (Bluetooth SPP transport, experimental)
 ppd/Brother_PT-P710BT.ppd PPD describing the printer to CUPS/macOS
 install/                  install.sh / uninstall.sh
+  pkg/build_pkg.sh         Builds a double-click .pkg installer (run once, on macOS)
 tools/list_bt_serial_ports.py  Helper to find the paired Bluetooth device's /dev/cu.* name
 tools/test_print.py       Standalone hardware test tool (bypasses CUPS; supports USB and Bluetooth)
 tools/check_media.py      Standalone "check media" tool (queries loaded tape over direct USB)
