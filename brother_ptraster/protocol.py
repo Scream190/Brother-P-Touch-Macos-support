@@ -69,7 +69,7 @@ class RasterJobBuilder:
         auto_cut: bool = True,
         high_resolution: bool = False,
         invert: bool = False,
-        feed_margin_mm: float = 25.0,
+        feed_margin_mm: float = 5.0,
         trailing_invalidate: bool = False,
         mode_byte: "int | None" = None,
         advanced_byte: "int | None" = None,
@@ -109,9 +109,18 @@ class RasterJobBuilder:
         # The gap between the print head and the cutter means a short job
         # can finish printing before the printed area has physically
         # reached the cutter -- confirmed on real hardware: most of a
-        # ~28mm test print stayed stuck inside the printer after cutting.
-        # This sets the trailing feed (in dots) applied before the final
-        # cut so the printed content actually clears the cutter and ejects.
+        # ~28mm test print stayed stuck inside the printer after cutting
+        # with no trailing margin at all. This sets the trailing feed (in
+        # dots) applied before the final cut so the printed content
+        # actually clears the cutter and ejects. 5mm is CONFIRMED on real
+        # hardware (12mm tape, realistic content length) to fully eject
+        # and cut cleanly -- an earlier, untested default of 25mm was
+        # needlessly generous, wasting tape on every label. Note the
+        # printer separately enforces a ~24mm minimum total label length
+        # (content + this margin combined); asking for less than that just
+        # makes it pad with extra blank feed rather than actually
+        # shrinking the label, so this margin's effect is only fully
+        # visible once content + margin exceeds that floor.
         self.feed_margin_dots = round(feed_margin_mm / 25.4 * DPI)
         # ABANDONED -- default OFF, do not re-enable. Three structurally
         # different implementations were tried on real hardware, all

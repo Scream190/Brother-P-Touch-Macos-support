@@ -26,7 +26,10 @@ fixes beyond the initial implementation:
 - a `feed_margin_mm` trailing feed before the cut (there's a physical gap
   between the print head and the cutter; a short job without enough
   trailing feed prints fine but the printed area doesn't clear the
-  cutter, so most of it stays stuck inside the printer)
+  cutter, so most of it stays stuck inside the printer). Confirmed on real
+  hardware that 5mm (the current default) is enough to fully eject and
+  cut cleanly -- the original 25mm default was an untested, overly
+  generous guess
 - bit 0x08 of the "advanced mode settings" byte, required for the printer
   to actually cut at the end of a job -- without it, the printer would
   print/feed correctly but only cut once a *next* job's Invalidate
