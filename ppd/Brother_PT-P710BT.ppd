@@ -44,11 +44,13 @@
 *% height. The filter (rastertoptp710bt) reads tape width from cupsHEIGHT
 *% accordingly (see nearest_media() call there), and transposes the
 *% raster grid to match the printer's line-per-tape-width-scan format.
-*% Six length steps per tape width (20/40/60/80/100/150mm), since macOS/
-*% CUPS's Paper Size is always ONE combined (width x length) choice --
-*% there's no way to offer independent width and length pickers, on this
-*% or any other printer. Continuous tape has no fixed length, so these
-*% are generous upper bounds, not fixed output sizes: the filter's
+*% Six generic length steps per tape width (20/40/60/80/100/150mm), plus
+*% a few user-requested fixed sizes matching specific real label lengths
+*% (12mm: 25/43/55/110mm; 18mm: 43mm; 24mm: 110mm) -- since macOS/CUPS's
+*% Paper Size is always ONE combined (width x length) choice, there's no
+*% way to offer independent width and length pickers, on this or any
+*% other printer. Continuous tape has no fixed length, so the generic
+*% steps are generous upper bounds, not fixed output sizes: the filter's
 *% "Automatic Length" feature (see *AutoLength below) trims whatever
 *% blank tape a job's actual content doesn't use, so picking a step at
 *% least as big as your content just works, without needing "Manage
@@ -78,13 +80,18 @@
 *PageSize mm9/9mm Tape (100mm): "<</PageSize[283 26]/ImagingBBox null>>setpagedevice"
 *PageSize mm9-long/9mm Tape (150mm (long)): "<</PageSize[425 26]/ImagingBBox null>>setpagedevice"
 *PageSize mm12-20/12mm Tape (20mm): "<</PageSize[57 34]/ImagingBBox null>>setpagedevice"
+*PageSize mm12-25/12mm Tape (25mm): "<</PageSize[71 34]/ImagingBBox null>>setpagedevice"
 *PageSize mm12-40/12mm Tape (40mm): "<</PageSize[113 34]/ImagingBBox null>>setpagedevice"
+*PageSize mm12-43/12mm Tape (43mm): "<</PageSize[122 34]/ImagingBBox null>>setpagedevice"
+*PageSize mm12-55/12mm Tape (55mm): "<</PageSize[156 34]/ImagingBBox null>>setpagedevice"
 *PageSize mm12-60/12mm Tape (60mm): "<</PageSize[170 34]/ImagingBBox null>>setpagedevice"
 *PageSize mm12-80/12mm Tape (80mm): "<</PageSize[227 34]/ImagingBBox null>>setpagedevice"
 *PageSize mm12/12mm Tape (100mm): "<</PageSize[283 34]/ImagingBBox null>>setpagedevice"
+*PageSize mm12-110/12mm Tape (110mm): "<</PageSize[312 34]/ImagingBBox null>>setpagedevice"
 *PageSize mm12-long/12mm Tape (150mm (long)): "<</PageSize[425 34]/ImagingBBox null>>setpagedevice"
 *PageSize mm18-20/18mm Tape (20mm): "<</PageSize[57 51]/ImagingBBox null>>setpagedevice"
 *PageSize mm18-40/18mm Tape (40mm): "<</PageSize[113 51]/ImagingBBox null>>setpagedevice"
+*PageSize mm18-43/18mm Tape (43mm): "<</PageSize[122 51]/ImagingBBox null>>setpagedevice"
 *PageSize mm18-60/18mm Tape (60mm): "<</PageSize[170 51]/ImagingBBox null>>setpagedevice"
 *PageSize mm18-80/18mm Tape (80mm): "<</PageSize[227 51]/ImagingBBox null>>setpagedevice"
 *PageSize mm18/18mm Tape (100mm): "<</PageSize[283 51]/ImagingBBox null>>setpagedevice"
@@ -94,6 +101,7 @@
 *PageSize mm24-60/24mm Tape (60mm): "<</PageSize[170 68]/ImagingBBox null>>setpagedevice"
 *PageSize mm24-80/24mm Tape (80mm): "<</PageSize[227 68]/ImagingBBox null>>setpagedevice"
 *PageSize mm24/24mm Tape (100mm): "<</PageSize[283 68]/ImagingBBox null>>setpagedevice"
+*PageSize mm24-110/24mm Tape (110mm): "<</PageSize[312 68]/ImagingBBox null>>setpagedevice"
 *PageSize mm24-long/24mm Tape (150mm (long)): "<</PageSize[425 68]/ImagingBBox null>>setpagedevice"
 *CloseUI: *PageSize
 
@@ -119,13 +127,18 @@
 *PageRegion mm9/9mm Tape (100mm): "<</PageSize[283 26]/ImagingBBox null>>setpagedevice"
 *PageRegion mm9-long/9mm Tape (150mm (long)): "<</PageSize[425 26]/ImagingBBox null>>setpagedevice"
 *PageRegion mm12-20/12mm Tape (20mm): "<</PageSize[57 34]/ImagingBBox null>>setpagedevice"
+*PageRegion mm12-25/12mm Tape (25mm): "<</PageSize[71 34]/ImagingBBox null>>setpagedevice"
 *PageRegion mm12-40/12mm Tape (40mm): "<</PageSize[113 34]/ImagingBBox null>>setpagedevice"
+*PageRegion mm12-43/12mm Tape (43mm): "<</PageSize[122 34]/ImagingBBox null>>setpagedevice"
+*PageRegion mm12-55/12mm Tape (55mm): "<</PageSize[156 34]/ImagingBBox null>>setpagedevice"
 *PageRegion mm12-60/12mm Tape (60mm): "<</PageSize[170 34]/ImagingBBox null>>setpagedevice"
 *PageRegion mm12-80/12mm Tape (80mm): "<</PageSize[227 34]/ImagingBBox null>>setpagedevice"
 *PageRegion mm12/12mm Tape (100mm): "<</PageSize[283 34]/ImagingBBox null>>setpagedevice"
+*PageRegion mm12-110/12mm Tape (110mm): "<</PageSize[312 34]/ImagingBBox null>>setpagedevice"
 *PageRegion mm12-long/12mm Tape (150mm (long)): "<</PageSize[425 34]/ImagingBBox null>>setpagedevice"
 *PageRegion mm18-20/18mm Tape (20mm): "<</PageSize[57 51]/ImagingBBox null>>setpagedevice"
 *PageRegion mm18-40/18mm Tape (40mm): "<</PageSize[113 51]/ImagingBBox null>>setpagedevice"
+*PageRegion mm18-43/18mm Tape (43mm): "<</PageSize[122 51]/ImagingBBox null>>setpagedevice"
 *PageRegion mm18-60/18mm Tape (60mm): "<</PageSize[170 51]/ImagingBBox null>>setpagedevice"
 *PageRegion mm18-80/18mm Tape (80mm): "<</PageSize[227 51]/ImagingBBox null>>setpagedevice"
 *PageRegion mm18/18mm Tape (100mm): "<</PageSize[283 51]/ImagingBBox null>>setpagedevice"
@@ -135,6 +148,7 @@
 *PageRegion mm24-60/24mm Tape (60mm): "<</PageSize[170 68]/ImagingBBox null>>setpagedevice"
 *PageRegion mm24-80/24mm Tape (80mm): "<</PageSize[227 68]/ImagingBBox null>>setpagedevice"
 *PageRegion mm24/24mm Tape (100mm): "<</PageSize[283 68]/ImagingBBox null>>setpagedevice"
+*PageRegion mm24-110/24mm Tape (110mm): "<</PageSize[312 68]/ImagingBBox null>>setpagedevice"
 *PageRegion mm24-long/24mm Tape (150mm (long)): "<</PageSize[425 68]/ImagingBBox null>>setpagedevice"
 *CloseUI: *PageRegion
 
@@ -158,13 +172,18 @@
 *ImageableArea mm9/9mm Tape (100mm): "0 0 283 26"
 *ImageableArea mm9-long/9mm Tape (150mm (long)): "0 0 425 26"
 *ImageableArea mm12-20/12mm Tape (20mm): "0 0 57 34"
+*ImageableArea mm12-25/12mm Tape (25mm): "0 0 71 34"
 *ImageableArea mm12-40/12mm Tape (40mm): "0 0 113 34"
+*ImageableArea mm12-43/12mm Tape (43mm): "0 0 122 34"
+*ImageableArea mm12-55/12mm Tape (55mm): "0 0 156 34"
 *ImageableArea mm12-60/12mm Tape (60mm): "0 0 170 34"
 *ImageableArea mm12-80/12mm Tape (80mm): "0 0 227 34"
 *ImageableArea mm12/12mm Tape (100mm): "0 0 283 34"
+*ImageableArea mm12-110/12mm Tape (110mm): "0 0 312 34"
 *ImageableArea mm12-long/12mm Tape (150mm (long)): "0 0 425 34"
 *ImageableArea mm18-20/18mm Tape (20mm): "0 0 57 51"
 *ImageableArea mm18-40/18mm Tape (40mm): "0 0 113 51"
+*ImageableArea mm18-43/18mm Tape (43mm): "0 0 122 51"
 *ImageableArea mm18-60/18mm Tape (60mm): "0 0 170 51"
 *ImageableArea mm18-80/18mm Tape (80mm): "0 0 227 51"
 *ImageableArea mm18/18mm Tape (100mm): "0 0 283 51"
@@ -174,6 +193,7 @@
 *ImageableArea mm24-60/24mm Tape (60mm): "0 0 170 68"
 *ImageableArea mm24-80/24mm Tape (80mm): "0 0 227 68"
 *ImageableArea mm24/24mm Tape (100mm): "0 0 283 68"
+*ImageableArea mm24-110/24mm Tape (110mm): "0 0 312 68"
 *ImageableArea mm24-long/24mm Tape (150mm (long)): "0 0 425 68"
 
 *DefaultPaperDimension: mm12
@@ -196,13 +216,18 @@
 *PaperDimension mm9/9mm Tape (100mm): "283 26"
 *PaperDimension mm9-long/9mm Tape (150mm (long)): "425 26"
 *PaperDimension mm12-20/12mm Tape (20mm): "57 34"
+*PaperDimension mm12-25/12mm Tape (25mm): "71 34"
 *PaperDimension mm12-40/12mm Tape (40mm): "113 34"
+*PaperDimension mm12-43/12mm Tape (43mm): "122 34"
+*PaperDimension mm12-55/12mm Tape (55mm): "156 34"
 *PaperDimension mm12-60/12mm Tape (60mm): "170 34"
 *PaperDimension mm12-80/12mm Tape (80mm): "227 34"
 *PaperDimension mm12/12mm Tape (100mm): "283 34"
+*PaperDimension mm12-110/12mm Tape (110mm): "312 34"
 *PaperDimension mm12-long/12mm Tape (150mm (long)): "425 34"
 *PaperDimension mm18-20/18mm Tape (20mm): "57 51"
 *PaperDimension mm18-40/18mm Tape (40mm): "113 51"
+*PaperDimension mm18-43/18mm Tape (43mm): "122 51"
 *PaperDimension mm18-60/18mm Tape (60mm): "170 51"
 *PaperDimension mm18-80/18mm Tape (80mm): "227 51"
 *PaperDimension mm18/18mm Tape (100mm): "283 51"
@@ -212,6 +237,7 @@
 *PaperDimension mm24-60/24mm Tape (60mm): "170 68"
 *PaperDimension mm24-80/24mm Tape (80mm): "227 68"
 *PaperDimension mm24/24mm Tape (100mm): "283 68"
+*PaperDimension mm24-110/24mm Tape (110mm): "312 68"
 *PaperDimension mm24-long/24mm Tape (150mm (long)): "425 68"
 
 *% For content longer than even the "-long" (150mm) presets, use macOS's

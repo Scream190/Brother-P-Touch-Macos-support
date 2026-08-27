@@ -291,10 +291,12 @@ raster parsing/filter chain is also correct.
 ## Printing
 
 - In the Print dialog, pick the **Tape Width** matching the cassette
-  currently loaded. Each width (3.5/6/9/12/18/24mm) comes in 6 length
-  steps -- 20/40/60/80/100/150mm -- e.g. "12mm Tape (60mm)". See
-  "Automatic length" below for why the exact step rarely matters, and why
-  it's steps rather than an independent length control.
+  currently loaded. Each width (3.5/6/9/12/18/24mm) comes in 6 generic
+  length steps -- 20/40/60/80/100/150mm -- e.g. "12mm Tape (60mm)", plus a
+  few fixed sizes for specific real labels (12mm: 25/43/55/110mm; 18mm:
+  43mm; 24mm: 110mm). See "Automatic length" below for why the exact step
+  rarely matters, and why it's steps rather than an independent length
+  control.
 - **Cut Each Label** toggles auto-cut after each label.
 - **Automatic Length** (on by default) trims blank tape your content
   doesn't use -- see below.
