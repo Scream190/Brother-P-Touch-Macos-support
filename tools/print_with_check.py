@@ -23,6 +23,13 @@ Usage:
     python3 tools/print_with_check.py --media mm18 --serial 000J4G980818 \\
         --queue PT-P710BT --option AutoCut=False label.pdf
     python3 tools/print_with_check.py --media mm12 --skip-check label.pdf
+
+    # A PDF sized for something other than a preset's default ~40mm length
+    # needs a matching Custom size, or CUPS scales/crops it to fit the
+    # preset instead of printing at the PDF's actual size. --media can be
+    # any CUPS media value (including Custom.WxHmm/pt); --tape-width-mm is
+    # then required since it can't be inferred from a non-preset value:
+    python3 tools/print_with_check.py --media Custom.55x12mm --tape-width-mm 12 label.pdf
 """
 import argparse
 import os
@@ -37,11 +44,23 @@ from brother_ptraster.status import decode
 from brother_ptraster.usb_transport import UsbTransportError, query_status
 
 
-def check_media(ppd_media: str, serial: "str | None", tolerance_mm: float) -> None:
+def check_media(ppd_media: str, tape_width_mm: "float | None", serial: "str | None", tolerance_mm: float) -> None:
     """Raise SystemExit with a clear message if the loaded tape doesn't
-    match ``ppd_media`` (a PPD ``-o media=...`` value, e.g. "mm12").
+    match the expected width.
+
+    ``tape_width_mm``, if given, is used directly (needed for a CUPS
+    ``media`` value this driver doesn't have a preset for, e.g. a Custom
+    size -- there's no table to look its width up in). Otherwise the
+    width is inferred from ``ppd_media`` via the standard mmXX presets.
     """
-    expected = get_media_by_ppd_option(ppd_media)
+    if tape_width_mm is None:
+        try:
+            tape_width_mm = get_media_by_ppd_option(ppd_media).width_mm
+        except ValueError as exc:
+            raise SystemExit(
+                f"{exc}\nPass --tape-width-mm explicitly to verify a non-preset "
+                f"--media value (e.g. a Custom size), or --skip-check."
+            )
 
     try:
         reply = query_status(build_status_request(), serial=serial)
@@ -52,13 +71,12 @@ def check_media(ppd_media: str, serial: "str | None", tolerance_mm: float) -> No
         )
 
     status = decode(reply)
-    if abs(status.media_width_mm - expected.width_mm) > tolerance_mm:
+    if abs(status.media_width_mm - tape_width_mm) > tolerance_mm:
         raise SystemExit(
-            f"Refusing to print: you asked for {ppd_media} ({expected.width_mm}mm) "
+            f"Refusing to print: you asked for {ppd_media} ({tape_width_mm}mm) "
             f"but the printer reports {status.media_width_mm}mm "
             f"({status.media_type}) actually loaded.\n"
-            f"Either reload the correct tape, pass --media mm{status.media_width_mm:g} "
-            f"instead, or pass --skip-check to print anyway."
+            f"Either reload the correct tape, or pass --skip-check to print anyway."
         )
     print(f"Verified: {status.media_width_mm}mm {status.media_type} loaded, matches --media {ppd_media}.")
 
@@ -66,7 +84,8 @@ def check_media(ppd_media: str, serial: "str | None", tolerance_mm: float) -> No
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("file", help="file to print (PDF, etc.)")
-    parser.add_argument("--media", required=True, help="expected PPD media option, e.g. mm12 (see brother_ptraster.media.MEDIA_TABLE)")
+    parser.add_argument("--media", required=True, help="CUPS media value passed to lp, e.g. mm12 or a Custom size like Custom.55x12mm")
+    parser.add_argument("--tape-width-mm", type=float, default=None, help="tape width in mm to verify against; auto-inferred from --media if it's one of the standard mmXX presets, REQUIRED otherwise (e.g. for a Custom size)")
     parser.add_argument("--queue", default="PT-P710BT", help="CUPS queue name (default: PT-P710BT)")
     parser.add_argument("--serial", help="USB serial number to disambiguate for the check step, if more than one Brother USB device is attached")
     parser.add_argument("--tolerance-mm", type=float, default=1.0, help="allowed difference between requested and actual tape width before refusing to print (default 1.0mm)")
@@ -76,7 +95,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if not args.skip_check:
-        check_media(args.media, args.serial, args.tolerance_mm)
+        check_media(args.media, args.tape_width_mm, args.serial, args.tolerance_mm)
 
     lp_argv = ["lp", "-d", args.queue, "-n", str(args.copies), "-o", f"media={args.media}"]
     for opt in args.option:

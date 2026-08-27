@@ -43,14 +43,14 @@ def _status(media_width_mm):
 def test_check_media_passes_when_widths_match(monkeypatch):
     monkeypatch.setattr(print_with_check, "query_status", lambda request, serial=None: b"\x00" * 32)
     monkeypatch.setattr(print_with_check, "decode", lambda reply: _status(12))
-    print_with_check.check_media("mm12", serial=None, tolerance_mm=1.0)  # should not raise
+    print_with_check.check_media("mm12", None, serial=None, tolerance_mm=1.0)  # should not raise
 
 
 def test_check_media_refuses_when_widths_mismatch(monkeypatch):
     monkeypatch.setattr(print_with_check, "query_status", lambda request, serial=None: b"\x00" * 32)
     monkeypatch.setattr(print_with_check, "decode", lambda reply: _status(18))
     try:
-        print_with_check.check_media("mm12", serial=None, tolerance_mm=1.0)
+        print_with_check.check_media("mm12", None, serial=None, tolerance_mm=1.0)
     except SystemExit as exc:
         assert "18" in str(exc) and "mm12" in str(exc)
     else:
@@ -65,9 +65,26 @@ def test_check_media_reports_transport_errors_as_system_exit(monkeypatch):
 
     monkeypatch.setattr(print_with_check, "query_status", raise_error)
     try:
-        print_with_check.check_media("mm12", serial=None, tolerance_mm=1.0)
+        print_with_check.check_media("mm12", None, serial=None, tolerance_mm=1.0)
     except SystemExit as exc:
         assert "no device found" in str(exc)
         assert "--skip-check" in str(exc)
     else:
         raise AssertionError("expected SystemExit when the transport fails")
+
+
+def test_check_media_uses_explicit_tape_width_for_a_custom_media_value(monkeypatch):
+    monkeypatch.setattr(print_with_check, "query_status", lambda request, serial=None: b"\x00" * 32)
+    monkeypatch.setattr(print_with_check, "decode", lambda reply: _status(12))
+    # "Custom.55x12mm" isn't a preset get_media_by_ppd_option knows about --
+    # must not raise as long as --tape-width-mm is given explicitly.
+    print_with_check.check_media("Custom.55x12mm", 12.0, serial=None, tolerance_mm=1.0)
+
+
+def test_check_media_requires_tape_width_for_an_unknown_media_value(monkeypatch):
+    try:
+        print_with_check.check_media("Custom.55x12mm", None, serial=None, tolerance_mm=1.0)
+    except SystemExit as exc:
+        assert "--tape-width-mm" in str(exc)
+    else:
+        raise AssertionError("expected SystemExit when width can't be inferred")

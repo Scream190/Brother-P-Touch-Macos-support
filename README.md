@@ -299,6 +299,16 @@ the end simply becomes a slightly longer trailing margin, not wasted
 effort. There is a real hardware floor, though -- see "Minimum label
 length" above.
 
+**Match the Custom size to your PDF's actual page size, not just "long
+enough".** CUPS scales a PDF to fit whatever page size you tell it to
+print at -- if your PDF's own page size doesn't match, the content gets
+scaled and/or cropped instead of printing at its intended size (confirmed
+on real hardware: a PDF with page size 156×34pt = 55×12mm printed with
+`-o media=mm12`, which defaults to a ~40mm-long page, came out visibly
+wrong/incomplete). Check your PDF's actual page size (e.g. its MediaBox
+in points) and set the Custom size's Width to match, converting to mm if
+needed (`points / 72 * 25.4`).
+
 ## Checking the loaded media (auto-detection)
 
 Like the "check media" button in Brother's own P-touch software,
@@ -352,11 +362,15 @@ python3 tools/print_with_check.py --media mm12 --skip-check label.pdf
 # pass extra CUPS options through to lp, and/or disambiguate by serial:
 python3 tools/print_with_check.py --media mm18 --serial 000J4G980818 \
     --option AutoCut=False label.pdf
+# a PDF sized for something other than a preset's default ~40mm length
+# (see "Custom label length" above) needs --tape-width-mm too, since the
+# width can't be inferred from a non-preset --media value:
+python3 tools/print_with_check.py --media Custom.55x12mm --tape-width-mm 12 label.pdf
 ```
 
 It refuses to print (before anything is sent to the printer at all) if
-the loaded tape's width doesn't match `--media`, telling you what's
-actually loaded instead.
+the loaded tape's width doesn't match, telling you what's actually
+loaded instead.
 
 If it fails with a "busy"/"access" error: something else (a stale print
 job, or macOS's own generic USB-printing support) currently holds the USB
