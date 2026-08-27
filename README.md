@@ -291,14 +291,15 @@ raster parsing/filter chain is also correct.
 ## Printing
 
 - In the Print dialog, pick the **Tape Width** matching the cassette
-  currently loaded (3.5/6/9/12/18/24 mm, each with a "default" ~100mm and
-  a "(long)" ~150mm length variant -- see "Automatic length" below for
-  why the exact length rarely matters).
+  currently loaded. Each width (3.5/6/9/12/18/24mm) comes in 6 length
+  steps -- 20/40/60/80/100/150mm -- e.g. "12mm Tape (60mm)". See
+  "Automatic length" below for why the exact step rarely matters, and why
+  it's steps rather than an independent length control.
 - **Cut Each Label** toggles auto-cut after each label.
 - **Automatic Length** (on by default) trims blank tape your content
   doesn't use -- see below.
-- From the command line: `lp -d PT-P710BT -o media=mm12 file.pdf` (or
-  `mm12-long` for the ~150mm variant).
+- From the command line: `lp -d PT-P710BT -o media=mm12-60 file.pdf`
+  (`mm12`=100mm, `mm12-20`/`-40`/`-60`/`-80`/`-long`(150mm) for the rest).
 
 ### Automatic length
 
@@ -308,16 +309,16 @@ which Tape Width/Custom size you picked -- that size only needs to be
 *big enough* for your content, not an exact match. This is what makes
 "automatic length" possible at all: macOS/CUPS renders a job's content
 for a fixed page size before this driver ever sees it (there's no way for
-the driver to tell the OS "wait, use a different size" after the fact),
-but nothing says every bit of that fixed-size canvas has to be printed --
-most apps place content at the top of the page and leave the rest blank,
-and blank rows are exactly what gets trimmed.
+the driver to tell the OS "wait, use a different size" after the fact,
+and no way to offer independent width/length pickers either -- macOS's
+Paper Size is always one combined choice, for every printer), but nothing
+says every bit of that fixed-size canvas has to be printed -- most apps
+place content at the top of the page and leave the rest blank, and blank
+rows are exactly what gets trimmed.
 
-In practice this means: pick whichever Tape Width preset is *at least*
-as long as your content (the default ~100mm covers most labels; use the
-"(long)" ~150mm variant for bigger ones), and the printed label comes out
-sized to the actual content -- no "Manage Custom Sizes" needed for the
-common case anymore.
+In practice this means: pick whichever length step is *at least* as long
+as your content, and the printed label comes out sized to the actual
+content -- no "Manage Custom Sizes" needed for the common case anymore.
 
 Turn **Automatic Length** off if you deliberately want the full page size
 printed, blank space included (`-o AutoLength=False`).
@@ -326,15 +327,16 @@ printed, blank space included (`-o AutoLength=False`).
 picked** -- CUPS scales/crops a PDF down to fit whatever page size the
 job requests, and that happens before this filter ever runs, so there's
 no blank space left afterward to trim (confirmed on real hardware: a PDF
-with page size 156×34pt = 55×12mm printed with the *old* ~40mm default
-came out visibly wrong/incomplete -- with the current ~100mm default that
-specific case now fits without needing a Custom size at all, but a much
-longer label still would). If content still looks scaled/cut off after
-picking the "(long)" variant, it needs a Custom size instead (see below).
+with page size 156×34pt = 55×12mm printed with the *old* ~40mm-only
+default came out visibly wrong/incomplete -- with today's steps, the 60mm
+one now fits it without needing a Custom size at all, but a much longer
+label still would). If content still looks scaled/cut off after picking
+the 150mm step, it needs a Custom size instead (see below).
 
 ### Custom label length
 
-For content longer than even the "(long)" ~150mm presets: **Paper Size →
+For content longer than even the 150mm step, or a length that doesn't
+land on a step at all and you want an exact match anyway: **Paper Size →
 Manage Custom Sizes... → +** (in the Print dialog's paper size dropdown),
 then set **Width** to your desired label length and **Height** to match
 your loaded tape width -- this PPD declares pages WIDE (Width = label
@@ -348,7 +350,7 @@ There's rarely a need to match a Custom size exactly to your content's
 real length any more (Automatic Length trims the excess either way) --
 just make it long enough. Check your PDF's actual page size (e.g. its
 MediaBox in points, `points / 72 * 25.4` for mm) if you're not sure
-whether even the "(long)" preset is big enough.
+whether even the 150mm step is big enough.
 
 ## Checking the loaded media (auto-detection)
 
