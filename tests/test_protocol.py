@@ -9,17 +9,22 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from brother_ptraster.media import get_media, nearest_media, HEAD_PINS, BYTES_PER_LINE
+from brother_ptraster.media import get_media, nearest_media, HEAD_PINS, BYTES_PER_LINE, PIN_ALIGNMENT_TRIM_DOTS
 from brother_ptraster.protocol import RasterJobBuilder, build_status_request, pack_bitmap_row, ESC
 
 
 def test_media_table_widths_are_centered_within_head():
+    # "Centered" here allows for PIN_ALIGNMENT_TRIM_DOTS -- a small,
+    # real-hardware-motivated fine-tune shift off perfect centering (see
+    # media.py) -- clamped so it never pushes the active area off either
+    # edge of the head.
     for media in get_media("12mm"), get_media("24mm"), get_media("3.5mm"):
         assert media.print_dots <= HEAD_PINS
         assert media.pin_offset + media.print_dots <= HEAD_PINS
-        # symmetric (or off-by-one for odd remainders) centering
+        assert media.pin_offset >= 0
         remaining = HEAD_PINS - media.print_dots
-        assert media.pin_offset in (remaining // 2, remaining - remaining // 2)
+        expected = max(0, min(remaining, remaining // 2 + PIN_ALIGNMENT_TRIM_DOTS))
+        assert media.pin_offset == expected
 
 
 def test_24mm_uses_full_head():

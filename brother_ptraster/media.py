@@ -54,10 +54,27 @@ class MediaSpec:
         return f"mm{self.width_mm:g}"
 
 
+
+# Fine-tune constant for the assumed print head <-> tape alignment. Real
+# hardware test (12mm tape, full-width solid fill) found a small but
+# consistent asymmetry: ~0.5mm margin on one edge, ~0mm (right at the
+# edge) on the other -- meaning the printer's real head-to-tape alignment
+# is slightly off from perfectly centered, not centering-formula-wrong,
+# just a small mechanical/measurement offset. Positive shifts pin_offset
+# up (toward higher-numbered pins); the actual physical direction (which
+# edge that corresponds to) isn't known yet -- this value is a trial
+# guess, to be corrected based on whether the next real-hardware test
+# shows the asymmetry improve or worsen. 0 = no adjustment (previous
+# behavior).
+PIN_ALIGNMENT_TRIM_DOTS = 2
+
+
 def _centered(width_mm: float) -> MediaSpec:
     print_dots = round(width_mm / 25.4 * DPI)
     print_dots = min(print_dots, HEAD_PINS)
-    pin_offset = (HEAD_PINS - print_dots) // 2
+    max_offset = HEAD_PINS - print_dots
+    pin_offset = max_offset // 2 + PIN_ALIGNMENT_TRIM_DOTS
+    pin_offset = max(0, min(max_offset, pin_offset))
     return MediaSpec(
         name=f"{width_mm:g}mm",
         width_mm=width_mm,
