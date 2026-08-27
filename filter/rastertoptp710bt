@@ -37,7 +37,7 @@ else:
 
 from brother_ptraster.cups_raster import read_pages, RasterFormatError
 from brother_ptraster.media import DPI, nearest_media
-from brother_ptraster.orient import transform_page
+from brother_ptraster.orient import transform_page, trim_blank_rows
 from brother_ptraster.protocol import RasterJobBuilder
 
 # PPD *ImageRotate choice names -> degrees clockwise.
@@ -103,8 +103,9 @@ def main() -> int:
     auto_cut = opts.get("AutoCut", "True") != "False"
     rotate = ROTATE_CHOICES.get(opts.get("ImageRotate", "None"), 0)
     mirror = opts.get("ImageMirror", "False") == "True"
+    auto_length = opts.get("AutoLength", "True") != "False"
 
-    log("INFO", f"auto_cut={auto_cut} rotate={rotate} mirror={mirror} copies={copies}")
+    log("INFO", f"auto_cut={auto_cut} rotate={rotate} mirror={mirror} auto_length={auto_length} copies={copies}")
 
     src = open(infile, "rb") if infile else sys.stdin.buffer
     out = sys.stdout.buffer
@@ -170,6 +171,23 @@ def main() -> int:
             # no-op unless the job's options explicitly ask for it.
             if rotate or mirror:
                 rows, width = transform_page(rows, width, rotate=rotate, mirror=mirror)
+
+            # "Automatic length": a job's PageSize is an upper bound on
+            # how much tape a label CAN use, not how much it actually
+            # uses -- most apps place content at the top of the page and
+            # leave the rest blank rather than stretching it to fill an
+            # oversized size. Trimming that unused canvas here means
+            # picking a big, generous Custom size (see README.md) and
+            # getting a label sized to the actual content, without CUPS
+            # ever needing to know the real length up front. On by
+            # default; disable (PPD *AutoLength/Automatic Length) if you
+            # deliberately want the full page size printed, blank space
+            # included.
+            if auto_length:
+                rows = trim_blank_rows(rows)
+                if not rows:
+                    log("ERROR", f"page {page_num}: page is entirely blank, nothing to print")
+                    return 1
 
             width_mm = width / dpi_x * 25.4
             try:

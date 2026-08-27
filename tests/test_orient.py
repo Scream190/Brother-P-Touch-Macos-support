@@ -11,7 +11,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from brother_ptraster.orient import transform_page
+from brother_ptraster.orient import transform_page, trim_blank_rows
 from brother_ptraster.protocol import pack_bitmap_row
 
 # 2 rows x 3 cols "L"-ish shape:
@@ -72,3 +72,25 @@ def test_invalid_rotate_raises():
         pass
     else:
         raise AssertionError("expected ValueError for a non-90-multiple rotate")
+
+
+_BLANK = b"\x00"
+_INK = b"\x80"
+
+
+def test_trim_blank_rows_strips_leading_and_trailing_blank_only():
+    rows = [_BLANK, _BLANK, _INK, _BLANK, _INK, _BLANK, _BLANK]
+    assert trim_blank_rows(rows) == [_INK, _BLANK, _INK]
+
+
+def test_trim_blank_rows_leaves_fully_inked_content_unchanged():
+    rows = [_INK, _INK, _INK]
+    assert trim_blank_rows(rows) == rows
+
+
+def test_trim_blank_rows_returns_empty_for_an_all_blank_page():
+    assert trim_blank_rows([_BLANK, _BLANK, _BLANK]) == []
+
+
+def test_trim_blank_rows_handles_an_empty_list():
+    assert trim_blank_rows([]) == []

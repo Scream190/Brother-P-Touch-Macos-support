@@ -291,41 +291,64 @@ raster parsing/filter chain is also correct.
 ## Printing
 
 - In the Print dialog, pick the **Tape Width** matching the cassette
-  currently loaded (3.5/6/9/12/18/24 mm).
+  currently loaded (3.5/6/9/12/18/24 mm, each with a "default" ~100mm and
+  a "(long)" ~150mm length variant -- see "Automatic length" below for
+  why the exact length rarely matters).
 - **Cut Each Label** toggles auto-cut after each label.
-- From the command line: `lp -d PT-P710BT -o media=mm12 file.pdf`.
+- **Automatic Length** (on by default) trims blank tape your content
+  doesn't use -- see below.
+- From the command line: `lp -d PT-P710BT -o media=mm12 file.pdf` (or
+  `mm12-long` for the ~150mm variant).
+
+### Automatic length
+
+**On by default.** The filter trims blank tape from the start/end of
+every label down to just what the actual content needs, regardless of
+which Tape Width/Custom size you picked -- that size only needs to be
+*big enough* for your content, not an exact match. This is what makes
+"automatic length" possible at all: macOS/CUPS renders a job's content
+for a fixed page size before this driver ever sees it (there's no way for
+the driver to tell the OS "wait, use a different size" after the fact),
+but nothing says every bit of that fixed-size canvas has to be printed --
+most apps place content at the top of the page and leave the rest blank,
+and blank rows are exactly what gets trimmed.
+
+In practice this means: pick whichever Tape Width preset is *at least*
+as long as your content (the default ~100mm covers most labels; use the
+"(long)" ~150mm variant for bigger ones), and the printed label comes out
+sized to the actual content -- no "Manage Custom Sizes" needed for the
+common case anymore.
+
+Turn **Automatic Length** off if you deliberately want the full page size
+printed, blank space included (`-o AutoLength=False`).
+
+**This can't rescue content that's *bigger* than the page size you
+picked** -- CUPS scales/crops a PDF down to fit whatever page size the
+job requests, and that happens before this filter ever runs, so there's
+no blank space left afterward to trim (confirmed on real hardware: a PDF
+with page size 156×34pt = 55×12mm printed with the *old* ~40mm default
+came out visibly wrong/incomplete -- with the current ~100mm default that
+specific case now fits without needing a Custom size at all, but a much
+longer label still would). If content still looks scaled/cut off after
+picking the "(long)" variant, it needs a Custom size instead (see below).
 
 ### Custom label length
 
-The 6 Tape Width presets each carry a fixed default length (~40mm) --
-that's just a convenient starting point, not a hard limit: continuous
-tape has no fixed length, and the filter prints however much content it
-actually receives, regardless of the preset's nominal size.
+For content longer than even the "(long)" ~150mm presets: **Paper Size →
+Manage Custom Sizes... → +** (in the Print dialog's paper size dropdown),
+then set **Width** to your desired label length and **Height** to match
+your loaded tape width -- this PPD declares pages WIDE (Width = label
+length, Height = tape width), which is why it's Width you change here,
+not Height. Give it a name and click OK; it then shows up as a regular
+entry in the Paper Size list for this and future print jobs, without
+needing to redo this each time. There is a real hardware floor, though --
+see "Minimum label length" above.
 
-To set your own length: **Paper Size → Manage Custom Sizes... → +** (in
-the Print dialog's paper size dropdown), then set **Width** to your
-desired label length and **Height** to match your loaded tape width --
-this PPD declares pages WIDE (Width = label length, Height = tape width),
-which is why it's Width you change here, not Height. Give it a name and
-click OK; it then shows up as a regular entry in the Paper Size list for
-this and future print jobs, without needing to redo this each time.
-
-There's no separate "automatic length" option: the driver doesn't
-truncate or pad based on the page size you picked, so a custom size just
-needs to be *long enough* for your content -- some extra blank space at
-the end simply becomes a slightly longer trailing margin, not wasted
-effort. There is a real hardware floor, though -- see "Minimum label
-length" above.
-
-**Match the Custom size to your PDF's actual page size, not just "long
-enough".** CUPS scales a PDF to fit whatever page size you tell it to
-print at -- if your PDF's own page size doesn't match, the content gets
-scaled and/or cropped instead of printing at its intended size (confirmed
-on real hardware: a PDF with page size 156×34pt = 55×12mm printed with
-`-o media=mm12`, which defaults to a ~40mm-long page, came out visibly
-wrong/incomplete). Check your PDF's actual page size (e.g. its MediaBox
-in points) and set the Custom size's Width to match, converting to mm if
-needed (`points / 72 * 25.4`).
+There's rarely a need to match a Custom size exactly to your content's
+real length any more (Automatic Length trims the excess either way) --
+just make it long enough. Check your PDF's actual page size (e.g. its
+MediaBox in points, `points / 72 * 25.4` for mm) if you're not sure
+whether even the "(long)" preset is big enough.
 
 ## Checking the loaded media (auto-detection)
 
@@ -380,9 +403,9 @@ python3 tools/print_with_check.py --media mm12 --skip-check label.pdf
 # pass extra CUPS options through to lp, and/or disambiguate by serial:
 python3 tools/print_with_check.py --media mm18 --serial 000J4G980818 \
     --option AutoCut=False label.pdf
-# a PDF sized for something other than a preset's default ~40mm length
-# (see "Custom label length" above) needs --tape-width-mm too, since the
-# width can't be inferred from a non-preset --media value:
+# a PDF too long for even the "(long)" ~150mm preset needs a Custom size
+# (see "Custom label length" above), which needs --tape-width-mm too,
+# since the width can't be inferred from a non-preset --media value:
 python3 tools/print_with_check.py --media Custom.55x12mm --tape-width-mm 12 label.pdf
 ```
 
@@ -430,7 +453,7 @@ brother_ptraster/       Protocol library (no CUPS/macOS dependency; unit-testabl
   media.py               Tape width table, print-head geometry
   protocol.py             Brother raster-mode command encoder
   cups_raster.py          Minimal CUPS Raster page-stream reader
-  orient.py                Raster page rotate/mirror transforms
+  orient.py                Raster page rotate/mirror transforms, blank-row trimming
   status.py                Decoder for the printer's 32-byte status packet
   usb_transport.py         Direct (bidirectional) USB transport, for status queries only
   patterns.py              Test patterns (ruler/diagonal/etc.) for hardware bring-up

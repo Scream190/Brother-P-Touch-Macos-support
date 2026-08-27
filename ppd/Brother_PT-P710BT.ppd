@@ -44,51 +44,84 @@
 *% height. The filter (rastertoptp710bt) reads tape width from cupsHEIGHT
 *% accordingly (see nearest_media() call there), and transposes the
 *% raster grid to match the printer's line-per-tape-width-scan format.
+*% Two length variants per tape width: a 100mm "default" and a 150mm
+*% "-long" one for bigger labels. Continuous tape has no fixed length --
+*% these are just generous upper bounds, not fixed output sizes: the
+*% filter's "Automatic Length" feature (see *AutoLength below) trims
+*% whatever blank tape a job's actual content doesn't use, so picking a
+*% preset bigger than your content just works, without needing "Manage
+*% Custom Sizes" for the common case. Only content LONGER than a chosen
+*% preset needs a Custom size instead (see README.md's "Custom label
+*% length" section), since CUPS scales/crops content down to fit a page
+*% size that's too small for it, and that's not something this filter
+*% can undo after the fact.
 *OpenUI *PageSize/Tape Width: PickOne
 *OrderDependency: 10 AnySetup *PageSize
 *DefaultPageSize: mm12
-*PageSize mm3.5/3.5mm Tape: "<</PageSize[28 10]/ImagingBBox null>>setpagedevice"
-*PageSize mm6/6mm Tape: "<</PageSize[57 17]/ImagingBBox null>>setpagedevice"
-*PageSize mm9/9mm Tape: "<</PageSize[85 26]/ImagingBBox null>>setpagedevice"
-*PageSize mm12/12mm Tape: "<</PageSize[113 34]/ImagingBBox null>>setpagedevice"
-*PageSize mm18/18mm Tape: "<</PageSize[170 51]/ImagingBBox null>>setpagedevice"
-*PageSize mm24/24mm Tape: "<</PageSize[227 68]/ImagingBBox null>>setpagedevice"
+*PageSize mm3.5/3.5mm Tape: "<</PageSize[283 10]/ImagingBBox null>>setpagedevice"
+*PageSize mm3.5-long/3.5mm Tape (long): "<</PageSize[425 10]/ImagingBBox null>>setpagedevice"
+*PageSize mm6/6mm Tape: "<</PageSize[283 17]/ImagingBBox null>>setpagedevice"
+*PageSize mm6-long/6mm Tape (long): "<</PageSize[425 17]/ImagingBBox null>>setpagedevice"
+*PageSize mm9/9mm Tape: "<</PageSize[283 26]/ImagingBBox null>>setpagedevice"
+*PageSize mm9-long/9mm Tape (long): "<</PageSize[425 26]/ImagingBBox null>>setpagedevice"
+*PageSize mm12/12mm Tape: "<</PageSize[283 34]/ImagingBBox null>>setpagedevice"
+*PageSize mm12-long/12mm Tape (long): "<</PageSize[425 34]/ImagingBBox null>>setpagedevice"
+*PageSize mm18/18mm Tape: "<</PageSize[283 51]/ImagingBBox null>>setpagedevice"
+*PageSize mm18-long/18mm Tape (long): "<</PageSize[425 51]/ImagingBBox null>>setpagedevice"
+*PageSize mm24/24mm Tape: "<</PageSize[283 68]/ImagingBBox null>>setpagedevice"
+*PageSize mm24-long/24mm Tape (long): "<</PageSize[425 68]/ImagingBBox null>>setpagedevice"
 *CloseUI: *PageSize
 
 *OpenUI *PageRegion/Tape Width: PickOne
 *OrderDependency: 10 AnySetup *PageRegion
 *DefaultPageRegion: mm12
-*PageRegion mm3.5/3.5mm Tape: "<</PageSize[28 10]/ImagingBBox null>>setpagedevice"
-*PageRegion mm6/6mm Tape: "<</PageSize[57 17]/ImagingBBox null>>setpagedevice"
-*PageRegion mm9/9mm Tape: "<</PageSize[85 26]/ImagingBBox null>>setpagedevice"
-*PageRegion mm12/12mm Tape: "<</PageSize[113 34]/ImagingBBox null>>setpagedevice"
-*PageRegion mm18/18mm Tape: "<</PageSize[170 51]/ImagingBBox null>>setpagedevice"
-*PageRegion mm24/24mm Tape: "<</PageSize[227 68]/ImagingBBox null>>setpagedevice"
+*PageRegion mm3.5/3.5mm Tape: "<</PageSize[283 10]/ImagingBBox null>>setpagedevice"
+*PageRegion mm3.5-long/3.5mm Tape (long): "<</PageSize[425 10]/ImagingBBox null>>setpagedevice"
+*PageRegion mm6/6mm Tape: "<</PageSize[283 17]/ImagingBBox null>>setpagedevice"
+*PageRegion mm6-long/6mm Tape (long): "<</PageSize[425 17]/ImagingBBox null>>setpagedevice"
+*PageRegion mm9/9mm Tape: "<</PageSize[283 26]/ImagingBBox null>>setpagedevice"
+*PageRegion mm9-long/9mm Tape (long): "<</PageSize[425 26]/ImagingBBox null>>setpagedevice"
+*PageRegion mm12/12mm Tape: "<</PageSize[283 34]/ImagingBBox null>>setpagedevice"
+*PageRegion mm12-long/12mm Tape (long): "<</PageSize[425 34]/ImagingBBox null>>setpagedevice"
+*PageRegion mm18/18mm Tape: "<</PageSize[283 51]/ImagingBBox null>>setpagedevice"
+*PageRegion mm18-long/18mm Tape (long): "<</PageSize[425 51]/ImagingBBox null>>setpagedevice"
+*PageRegion mm24/24mm Tape: "<</PageSize[283 68]/ImagingBBox null>>setpagedevice"
+*PageRegion mm24-long/24mm Tape (long): "<</PageSize[425 68]/ImagingBBox null>>setpagedevice"
 *CloseUI: *PageRegion
 
 *DefaultImageableArea: mm12
-*ImageableArea mm3.5/3.5mm Tape: "0 0 28 10"
-*ImageableArea mm6/6mm Tape: "0 0 57 17"
-*ImageableArea mm9/9mm Tape: "0 0 85 26"
-*ImageableArea mm12/12mm Tape: "0 0 113 34"
-*ImageableArea mm18/18mm Tape: "0 0 170 51"
-*ImageableArea mm24/24mm Tape: "0 0 227 68"
+*ImageableArea mm3.5/3.5mm Tape: "0 0 283 10"
+*ImageableArea mm3.5-long/3.5mm Tape (long): "0 0 425 10"
+*ImageableArea mm6/6mm Tape: "0 0 283 17"
+*ImageableArea mm6-long/6mm Tape (long): "0 0 425 17"
+*ImageableArea mm9/9mm Tape: "0 0 283 26"
+*ImageableArea mm9-long/9mm Tape (long): "0 0 425 26"
+*ImageableArea mm12/12mm Tape: "0 0 283 34"
+*ImageableArea mm12-long/12mm Tape (long): "0 0 425 34"
+*ImageableArea mm18/18mm Tape: "0 0 283 51"
+*ImageableArea mm18-long/18mm Tape (long): "0 0 425 51"
+*ImageableArea mm24/24mm Tape: "0 0 283 68"
+*ImageableArea mm24-long/24mm Tape (long): "0 0 425 68"
 
 *DefaultPaperDimension: mm12
-*PaperDimension mm3.5/3.5mm Tape: "28 10"
-*PaperDimension mm6/6mm Tape: "57 17"
-*PaperDimension mm9/9mm Tape: "85 26"
-*PaperDimension mm12/12mm Tape: "113 34"
-*PaperDimension mm18/18mm Tape: "170 51"
-*PaperDimension mm24/24mm Tape: "227 68"
+*PaperDimension mm3.5/3.5mm Tape: "283 10"
+*PaperDimension mm3.5-long/3.5mm Tape (long): "425 10"
+*PaperDimension mm6/6mm Tape: "283 17"
+*PaperDimension mm6-long/6mm Tape (long): "425 17"
+*PaperDimension mm9/9mm Tape: "283 26"
+*PaperDimension mm9-long/9mm Tape (long): "425 26"
+*PaperDimension mm12/12mm Tape: "283 34"
+*PaperDimension mm12-long/12mm Tape (long): "425 34"
+*PaperDimension mm18/18mm Tape: "283 51"
+*PaperDimension mm18-long/18mm Tape (long): "425 51"
+*PaperDimension mm24/24mm Tape: "283 68"
+*PaperDimension mm24-long/24mm Tape (long): "425 68"
 
-*% Continuous tape has no fixed length: the dimensions above are only
-*% convenient presets (~40mm default label length). For a different label
-*% length, use macOS's "Paper Size > Manage Custom Sizes..." and set the
-*% HEIGHT to match your loaded tape width (this PPD declares pages wide:
-*% Width = label length, Height = tape width -- the filter picks the tape
-*% width from the actual page height in the print job, not this preset's
-*% name).
+*% For content longer than even the "-long" (150mm) presets, use macOS's
+*% "Paper Size > Manage Custom Sizes..." and set the HEIGHT to match your
+*% loaded tape width (this PPD declares pages wide: Width = label length,
+*% Height = tape width -- the filter picks the tape width from the actual
+*% page height in the print job, not this preset's name).
 *MaxMediaWidth: "5000"
 *MinMediaWidth: "20"
 *MaxMediaHeight: "68"
@@ -118,6 +151,19 @@
 *AutoCut True/Yes: ""
 *AutoCut False/No: ""
 *CloseUI: *AutoCut
+
+*% Trims blank tape a job's actual content doesn't use, down to just what
+*% the content needs (read directly by the filter; not a real PostScript
+*% page-size change, so it works together with whichever Tape Width/
+*% Custom size you picked -- that just needs to be big enough for your
+*% content, not an exact match). Turn off if you deliberately want the
+*% full page size printed, blank space included.
+*OpenUI *AutoLength/Automatic Length: Boolean
+*OrderDependency: 10 AnySetup *AutoLength
+*DefaultAutoLength: True
+*AutoLength True/Yes: ""
+*AutoLength False/No: ""
+*CloseUI: *AutoLength
 
 *% The correct mirror correction (confirmed on real hardware) is now
 *% baked directly into the filter's mandatory transpose (see

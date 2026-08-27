@@ -72,3 +72,24 @@ def transform_page(rows: List[bytes], width: int, *, rotate: int = 0, mirror: bo
     n_bytes = -(-new_width // 8)  # ceil div
     new_rows = [pack_bitmap_row(r, n_bytes) for r in new_grid]
     return new_rows, new_width
+
+
+def trim_blank_rows(rows: List[bytes]) -> List[bytes]:
+    """Drop leading/trailing rows that carry no ink (all-zero bytes).
+
+    Backs "automatic length": a job's PageSize sets an upper bound on how
+    much tape a label CAN use, not how much it uses -- most apps place
+    content at the top of a page and leave the rest blank rather than
+    stretching it to fill an oversized custom size. Without this, that
+    unused canvas gets fed and printed as wasted blank tape, one raster
+    line at a time, exactly like real content would be. This only trims
+    what CUPS/the app supplied; RasterJobBuilder's own controlled
+    leading_margin_mm/feed_margin_mm are added separately, afterwards.
+    """
+    start = 0
+    while start < len(rows) and not any(rows[start]):
+        start += 1
+    end = len(rows)
+    while end > start and not any(rows[end - 1]):
+        end -= 1
+    return rows[start:end]
