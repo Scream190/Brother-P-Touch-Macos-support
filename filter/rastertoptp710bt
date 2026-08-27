@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+"""CUPS filter: CUPS Raster -> Brother PT-P710BT raster-mode command stream.
+
+Called by cupsd per the standard CUPS filter argv convention:
+
+    rastertoptp710bt job-id user title copies options [filename]
+
+Reads a CUPS Raster (application/vnd.cups-raster) job from ``filename`` or
+stdin, and writes the printer-ready Brother command bytes to stdout, where
+the ``ptp710bt`` backend (see ../backend/ptp710bt) picks them up and streams
+them to the printer over its paired Bluetooth serial connection.
+
+This filter sits at the END of the filter chain: the PPD's cupsFilter2 line
+tells CUPS to first turn the incoming job (PDF/PostScript/etc.) into CUPS
+Raster using CUPS's own bundled filters, and only then hand it to us. That
+keeps this file focused solely on the printer-specific raster-mode framing.
+
+This is a thin, model-specific wrapper: all the actual logic (CUPS Raster
+parsing, orientation, Automatic Length, command framing) lives in
+brother_ptraster/filter_core.py, shared with the PT-P700/PT-P750W filters
+-- this file only supplies what's specific to a PT-P710BT unit (its own
+hardware-confirmed pin-alignment trim and margin; see
+brother_ptraster/media.py's PIN_ALIGNMENT_TRIM_DOTS docstring for why
+those aren't assumed to transfer to a different unit or model).
+"""
+import os
+import sys
+
+# install.sh vendors a copy of the brother_ptraster package directly next
+# to this script (see install/install.sh) rather than under /usr/local:
+# cupsd runs filters under a restricted filesystem sandbox on modern macOS
+# that does not appear to allow reading /usr/local, even as root -- real
+# hardware test showed "ModuleNotFoundError: No module named
+# 'brother_ptraster'" despite the directory demonstrably existing there
+# with correct permissions. /usr/libexec/cups/filter is provably readable
+# (cupsd is already executing this very script from inside it), so that's
+# where the package needs to live for the installed case. Falls back to
+# the repo layout (../) so this also works uninstalled, straight out of a
+# git checkout.
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+if os.path.isdir(os.path.join(_THIS_DIR, "brother_ptraster")):
+    sys.path.insert(0, _THIS_DIR)
+else:
+    sys.path.insert(0, os.path.join(_THIS_DIR, ".."))
+
+from brother_ptraster.filter_core import run
+from brother_ptraster.media import build_media_table, PIN_ALIGNMENT_TRIM_DOTS
+
+# CONFIRMED on real PT-P710BT hardware -- see media.py/protocol.py for how.
+MEDIA_TABLE = build_media_table(PIN_ALIGNMENT_TRIM_DOTS)
+DEFAULT_MARGIN_MM = 5.0
+
+if __name__ == "__main__":
+    sys.exit(run("rastertoptp710bt", MEDIA_TABLE, DEFAULT_MARGIN_MM, sys.argv, sys.stdin.buffer, sys.stdout.buffer))

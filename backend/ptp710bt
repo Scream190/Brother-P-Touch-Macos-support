@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+"""CUPS backend for the Brother PT-P710BT, connected via macOS's paired
+Bluetooth "Serial Port" service (SPP).
+
+The PT-P710BT is a Bluetooth Classic (not BLE) label printer. Once you pair
+it in System Settings > Bluetooth, macOS's Bluetooth stack exposes it as a
+serial device at ``/dev/cu.<PairedName>`` (see tools/list_bt_serial_ports.py
+to find the exact name) that behaves like an ordinary tty: writing raw bytes
+to it sends them over the SPP connection. That means this backend needs no
+IOBluetooth/CoreBluetooth calls of its own -- it just opens that device node
+and streams the printer command bytes CUPS hands it on stdin.
+
+Device URI scheme used by this backend: ``ptp710bt://<serial-device-name>``
+where ``<serial-device-name>`` is the ``/dev/cu.*`` suffix, e.g.
+``ptp710bt://PT-P710BT-SerialPort`` for ``/dev/cu.PT-P710BT-SerialPort``.
+
+Follows the standard CUPS backend calling convention:
+  - No arguments: print one device line per discovered/candidate device and
+    exit 0.
+  - 5 or 6 arguments (job-id user title copies options [file]): send the job
+    to the device named by the ``DEVICE_URI`` environment variable.
+
+Exit codes follow CUPS's backend exit-code contract (see ``cups/backend.h``):
+  0 = success, 1 = failed (don't retry), 6 = failed (retry later).
+"""
+import glob
+import os
+import sys
+import time
+
+EXIT_OK = 0
+EXIT_FAILED = 1
+EXIT_RETRY = 6
+
+DEV_GLOB = "/dev/cu.*"
+# Bluetooth serial ports macOS creates for paired SPP devices commonly carry
+# the paired device's advertised name. Brother's PT-P710BT advertises as
+# "PT-P710BT" (possibly followed by a serial-number suffix).
+NAME_HINTS = ("PT-P710BT", "Brother")
+EXCLUDE_HINTS = ("Bluetooth-Incoming-Port", "debug-console", "wlan-debug")
+
+
+def log(level: str, message: str) -> None:
+    sys.stderr.write(f"{level}: [ptp710bt backend] {message}\n")
+    sys.stderr.flush()
+
+
+def discover() -> list:
+    candidates = []
+    for path in sorted(glob.glob(DEV_GLOB)):
+        base = os.path.basename(path)[len("cu.") :]
+        if any(x in base for x in EXCLUDE_HINTS):
+            continue
+        candidates.append(base)
+    return candidates
+
+
+def do_discovery() -> int:
+    found = discover()
+    likely = [c for c in found if any(h in c for h in NAME_HINTS)]
+    others = [c for c in found if c not in likely]
+
+    for name in likely:
+        print(
+            f'direct ptp710bt://{name} "Brother PT-P710BT" "Brother PT-P710BT (Bluetooth, {name})"'
+        )
+    for name in others:
+        # Any other paired Bluetooth serial device: listed as a lower-confidence
+        # candidate so the user can still pick it manually if our name-based
+        # heuristic misses their device's advertised name.
+        print(f'direct ptp710bt://{name} "Brother PT-P710BT" "Bluetooth serial device {name}"')
+
+    if not found:
+        log(
+            "INFO",
+            "no paired Bluetooth serial devices found; pair the PT-P710BT in "
+            "System Settings > Bluetooth first",
+        )
+    return EXIT_OK
+
+
+def resolve_device_path(uri: str) -> str:
+    if not uri.startswith("ptp710bt://"):
+        raise ValueError(f"unsupported device URI scheme: {uri}")
+    name = uri[len("ptp710bt://") :].rstrip("/")
+    if not name:
+        raise ValueError("device URI is missing the serial device name")
+    return f"/dev/cu.{name}"
+
+
+def send_job(device_path: str, data: bytes) -> int:
+    if not os.path.exists(device_path):
+        log(
+            "ERROR",
+            f"{device_path} not found; is the printer paired and powered on?",
+        )
+        return EXIT_RETRY
+
+    try:
+        # O_RDWR (not O_WRONLY): some macOS Bluetooth SPP virtual serial
+        # ports only fully bring up the RFCOMM connection when opened for
+        # both reading and writing.
+        fd = os.open(device_path, os.O_RDWR | os.O_NOCTTY)
+    except OSError as exc:
+        log("ERROR", f"could not open {device_path}: {exc}")
+        return EXIT_RETRY
+
+    try:
+        try:
+            import termios
+            import tty
+
+            tty.setraw(fd)
+            attrs = termios.tcgetattr(fd)
+            attrs[2] &= ~termios.CRTSCTS  # disable hardware flow control
+            termios.tcsetattr(fd, termios.TCSANOW, attrs)
+        except Exception as exc:  # pragma: no cover - best effort
+            log("DEBUG", f"could not configure raw/flow-control tty mode (continuing anyway): {exc}")
+
+        # Give the Bluetooth SPP connection a moment to actually come up
+        # before writing -- opening the device node can return before the
+        # underlying RFCOMM channel is connected.
+        time.sleep(0.5)
+
+        total = len(data)
+        written = 0
+        while written < total:
+            try:
+                written += os.write(fd, data[written:])
+            except BlockingIOError:
+                time.sleep(0.05)
+            except OSError as exc:
+                log("ERROR", f"write failed after {written}/{total} bytes: {exc}")
+                return EXIT_RETRY
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+    log("INFO", f"sent {total} bytes to {device_path}")
+    return EXIT_OK
+
+
+def main() -> int:
+    if len(sys.argv) == 1:
+        return do_discovery()
+
+    if len(sys.argv) not in (6, 7):
+        log("ERROR", f"usage: {sys.argv[0]} job-id user title copies options [file]")
+        return EXIT_FAILED
+
+    device_uri = os.environ.get("DEVICE_URI", "")
+    try:
+        device_path = resolve_device_path(device_uri)
+    except ValueError as exc:
+        log("ERROR", str(exc))
+        return EXIT_FAILED
+
+    infile = sys.argv[6] if len(sys.argv) == 7 else None
+    if infile:
+        with open(infile, "rb") as f:
+            data = f.read()
+    else:
+        data = sys.stdin.buffer.read()
+
+    if not data:
+        log("ERROR", "no job data received")
+        return EXIT_FAILED
+
+    return send_job(device_path, data)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
