@@ -59,23 +59,32 @@ fixes beyond the initial implementation:
 
 All fixed and covered by regression tests.
 
-**Leading cleanup (every job starts with its own feed+cut cycle) is
-experimental and risky.** Two implementations have hung the printer/USB
-connection on real hardware so far:
-1. concatenating a 0-line cleanup segment and the real job into one
-   transmission (needed a full Mac restart to recover)
+**Leading cleanup (every job starting with its own feed+cut cycle) was
+tried and abandoned.** Three structurally different implementations were
+tested on real hardware, all failed:
+1. a 0-line cleanup segment concatenated with the real job into one
+   transmission -- hung the printer/USB connection, needed a full Mac
+   restart to recover
 2. the same 0-line segment sent as a genuinely separate transmission with
-   a pause before the real job (recovered with just an unplug/replug that
-   time, but still hung)
+   a pause before the real job -- still hung (recovered with just an
+   unplug/replug that time)
+3. real blank raster lines instead of declaring 0 (to rule out
+   `raster_count=0` as the trigger) -- didn't hang, but put the printer
+   into an error state (blinking red LED) without feeding or cutting
 
-Since changing the transmission framing between attempts didn't help, the
-working hypothesis is that a content-free (`raster_count=0`) job
-specifically confuses the firmware, not how it's sent. The current
-variant (`RasterJobBuilder.build_cleanup_segment()`) sends real blank
-raster lines instead of declaring 0, to test that -- **still unconfirmed
-on real hardware.** Off by default; the CUPS filter doesn't use it. Test
-with `tools/test_print.py --leading-cleanup` and a short throwaway job
-first, and be ready for another hang.
+Three different failure modes across three different framings is a real
+pattern: this printer's firmware doesn't handle a standalone feed+cut job
+preceding a real one, at least not in any of the ways tried here. Not
+being pursued further. Off by default; the CUPS filter doesn't use it,
+and the code (`RasterJobBuilder.leading_cleanup` /
+`build_cleanup_segment()`, `tools/test_print.py --leading-cleanup`) is
+kept only as a record of what was tried.
+
+The practical goal behind it — minimizing blank tape at the start of a
+label — is instead addressed by reducing `feed_margin_mm`: the "leading"
+blank tape on a print is really the *previous* job's trailing margin,
+left attached at wherever that job's cut landed. Shrinking the trailing
+margin shrinks both ends at once, safely.
 
 ## How it works
 

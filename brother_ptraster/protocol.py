@@ -113,31 +113,36 @@ class RasterJobBuilder:
         # This sets the trailing feed (in dots) applied before the final
         # cut so the printed content actually clears the cutter and ejects.
         self.feed_margin_dots = round(feed_margin_mm / 25.4 * DPI)
-        # DEFAULT OFF -- two earlier implementations both hung the
-        # printer/USB connection on real hardware:
+        # ABANDONED -- default OFF, do not re-enable. Three structurally
+        # different implementations were tried on real hardware, all
+        # failed:
         #   1. a 0-line cleanup segment concatenated with the real segment
-        #      into ONE transmission (needed a full Mac restart to recover)
+        #      into ONE transmission -- hung the printer/USB connection,
+        #      needed a full Mac restart to recover
         #   2. the same 0-line segment sent as a genuinely separate
-        #      transmission with a pause before the real job (recovered
-        #      with just an unplug/replug that time, but still hung)
-        # Changing the transmission framing between attempt 1 and 2 didn't
-        # help, so the working hypothesis is now that a content-free
-        # (raster_count=0) job specifically confuses the firmware, not the
-        # framing. build_cleanup_segment() now sends real (blank) raster
-        # lines instead of declaring 0, to test that -- see its docstring.
-        # STILL UNCONFIRMED on real hardware. The intent (user-requested)
-        # is unchanged: every job starts with its own tiny feed+cut cycle
-        # first, so each label starts on a freshly-cut, consistent tape
-        # edge regardless of what came before.
+        #      transmission with a pause before the real job -- still hung
+        #      (recovered with just an unplug/replug that time)
+        #   3. build_cleanup_segment() sending real blank raster lines
+        #      instead of declaring 0 (to rule out raster_count=0 as the
+        #      trigger) -- didn't hang, but put the printer into an error
+        #      state (solid/blinking red LED); it self-cleared after a
+        #      later status request's Invalidate+Initialize, but the job
+        #      itself did not print/feed/cut
+        # Three different failure modes across three different framings is
+        # a real pattern, not implementation noise: this printer's firmware
+        # does not handle a standalone feed+cut job (with or without
+        # content) preceding a real one. Not investigating further --
+        # see feed_margin_mm above for the safe alternative (reducing it
+        # shrinks the same blank-tape waste at both ends of a label, since
+        # the "leading" blank on any print is really the previous job's
+        # trailing margin, carried over to where that job's cut landed).
         #
-        # This flag is just a marker read by callers (see
-        # tools/test_print.py); it does NOT change what build() returns.
-        # The caller is responsible for sending build_cleanup_segment() as
-        # a genuinely separate transmission (its own connect/write/
-        # disconnect cycle) BEFORE build()'s segment, with a real pause in
-        # between for the feed+cut motion to physically finish. Treat this
-        # as risky: test with a short throwaway job first, on a machine
-        # that isn't mid-print, and be ready for another hang.
+        # This flag and build_cleanup_segment() are kept only as a record
+        # of what was tried, exposed via tools/test_print.py
+        # --leading-cleanup for anyone who wants to experiment further
+        # (e.g. a different advanced-byte combination, a longer pause) --
+        # not as a supported feature. It does not change what build()
+        # returns.
         self.leading_cleanup = leading_cleanup
         self._lines: List[bytes] = []
 
@@ -255,24 +260,13 @@ class RasterJobBuilder:
         return bytes(out)
 
     def build_cleanup_segment(self, blank_lines: int = 20) -> bytes:
-        """A complete, independent job segment structured exactly like a
-        real print job -- ``blank_lines`` blank (all-zero) raster lines,
-        then the SAME print-with-feed(+cut) ending already proven reliable
-        -- instead of declaring 0 raster lines.
-
-        Two earlier variants that declared a 0-line job (one concatenated
-        in-band with the real job, one sent as a genuinely separate USB
-        transmission with a pause) BOTH hung the printer/USB connection on
-        real hardware. Since changing the transmission framing didn't help
-        the second time, the working hypothesis is now that a
-        content-free (raster_count=0) job specifically confuses the
-        firmware -- not how/when it's sent. This variant never declares
-        raster_count=0, to test that hypothesis. STILL UNCONFIRMED on real
-        hardware -- treat with the same caution as before (short test
-        first, expect a possible hang/replug-or-restart).
-
-        Meant to be sent as its own separate transmission before build()'s
-        segment, same as the previous variant (see tools/test_print.py).
+        """ABANDONED (see ``leading_cleanup`` in __init__) -- a standalone
+        feed+cut job segment, ``blank_lines`` blank raster lines instead of
+        declaring 0. Confirmed on real hardware NOT to hang (unlike the two
+        0-line variants), but it puts the printer into an error state
+        (blinking red LED) instead and doesn't actually feed/cut. Kept only
+        as a record of what was tried / for further experimentation via
+        tools/test_print.py --leading-cleanup, not as something to build on.
         """
         blank_line = bytes(BYTES_PER_LINE)
         return self._build_segment([blank_line] * max(1, blank_lines))
