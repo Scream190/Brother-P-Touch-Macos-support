@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+"""CUPS filter: CUPS Raster -> Brother PT-P750W raster-mode command stream.
+
+Called by cupsd per the standard CUPS filter argv convention:
+
+    rastertoptp750w job-id user title copies options [filename]
+
+See filter/rastertoptp710bt's docstring for the general shape of this
+(this file only differs in which model-specific constants it supplies to
+the shared brother_ptraster/filter_core.py logic).
+
+UNCONFIRMED ON REAL HARDWARE: the PT-P750W shares the PT-P710BT's tape
+widths and 128-pin/180dpi head, and Brother documents both models' raster
+command protocol together in one reference (high confidence the protocol
+itself is identical) -- but the pin-alignment trim / feed margin below
+are just copied from the PT-P710BT's hardware-confirmed values as a
+starting guess, since those are mechanical properties of one specific
+physical unit, not determined by the shared protocol. Validate with
+tools/test_print.py (pass a PT-P750W USB URI) before trusting this for
+real prints -- see README.md's "Other Brother P-touch models" section.
+"""
+import os
+import sys
+
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+if os.path.isdir(os.path.join(_THIS_DIR, "brother_ptraster")):
+    sys.path.insert(0, _THIS_DIR)
+else:
+    sys.path.insert(0, os.path.join(_THIS_DIR, ".."))
+
+from brother_ptraster.filter_core import run
+from brother_ptraster.media import build_media_table
+
+# UNCONFIRMED for this model -- see module docstring. Starting from the
+# PT-P710BT's hardware-confirmed values until this unit is tested
+# incrementally the same way (see README.md).
+PIN_ALIGNMENT_TRIM_DOTS = 3
+DEFAULT_MARGIN_MM = 5.0
+
+MEDIA_TABLE = build_media_table(PIN_ALIGNMENT_TRIM_DOTS)
+
+if __name__ == "__main__":
+    sys.exit(run("rastertoptp750w", MEDIA_TABLE, DEFAULT_MARGIN_MM, sys.argv, sys.stdin.buffer, sys.stdout.buffer))

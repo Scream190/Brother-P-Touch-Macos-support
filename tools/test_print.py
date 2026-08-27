@@ -53,7 +53,7 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from brother_ptraster.media import MEDIA_TABLE, get_media
+from brother_ptraster.media import MEDIA_TABLE, get_media, build_media_table
 from brother_ptraster.patterns import PATTERNS, generate
 from brother_ptraster.protocol import RasterJobBuilder
 
@@ -174,6 +174,7 @@ def send_via_usb(usb_uri: str, data: bytes, verbose: bool) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--media", choices=sorted(MEDIA_TABLE), default="12mm", help="tape width loaded in the printer")
+    parser.add_argument("--pin-alignment-trim-dots", type=int, default=None, help="override the print head <-> tape centering trim (see brother_ptraster.media.PIN_ALIGNMENT_TRIM_DOTS), e.g. when hardware-tuning this for a PT-P700/PT-P750W unit rather than the PT-P710BT this repo's default was confirmed against. Omit to use the PT-P710BT-confirmed default.")
     parser.add_argument("--pattern", choices=PATTERNS, default="ruler", help="test pattern to print")
     parser.add_argument("--length", type=int, default=200, help="label length in dots (180 dots ~= 25.4mm at 180dpi)")
     parser.add_argument("--no-cut", action="store_true", help="disable auto-cut after printing")
@@ -194,7 +195,10 @@ def main() -> int:
     parser.add_argument("-v", "--verbose", action="store_true", help="print a byte-level summary of the generated job")
     args = parser.parse_args()
 
-    media = get_media(args.media)
+    if args.pin_alignment_trim_dots is None:
+        media = get_media(args.media)
+    else:
+        media = get_media(args.media, table=build_media_table(args.pin_alignment_trim_dots))
     lines = generate(args.pattern, media, args.length)
 
     builder = RasterJobBuilder(

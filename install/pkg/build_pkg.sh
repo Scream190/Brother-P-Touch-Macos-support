@@ -50,12 +50,16 @@ PPD_DIR="$ROOT_DIR/Library/Printers/PPDs/Contents/Resources"
 mkdir -p "$FILTER_DIR" "$BACKEND_DIR" "$PPD_DIR"
 
 echo "==> Staging payload"
-install -m 755 "$REPO_DIR/filter/rastertoptp710bt" "$FILTER_DIR/rastertoptp710bt"
 cp -R "$REPO_DIR/brother_ptraster" "$FILTER_DIR/brother_ptraster"
 find "$FILTER_DIR/brother_ptraster" -type f -name '*.py' -exec chmod 644 {} \;
 find "$FILTER_DIR/brother_ptraster" -type d -exec chmod 755 {} \;
+for model in rastertoptp710bt rastertoptp700 rastertoptp750w; do
+  install -m 755 "$REPO_DIR/filter/$model" "$FILTER_DIR/$model"
+done
 install -m 755 "$REPO_DIR/backend/ptp710bt" "$BACKEND_DIR/ptp710bt"
-install -m 644 "$REPO_DIR/ppd/Brother_PT-P710BT.ppd" "$PPD_DIR/Brother_PT-P710BT.ppd"
+for ppd in Brother_PT-P710BT.ppd Brother_PT-P700.ppd Brother_PT-P750W.ppd; do
+  install -m 644 "$REPO_DIR/ppd/$ppd" "$PPD_DIR/$ppd"
+done
 
 VERSION="$(date +%Y.%m.%d)"
 COMPONENT_PKG="$BUILD_DIR/component.pkg"

@@ -462,6 +462,51 @@ job, or macOS's own generic USB-printing support) currently holds the USB
 interface open. Try unplugging and replugging the printer immediately
 before running the query, with no print job in progress.
 
+## Other Brother P-touch models
+
+This project also includes drivers for the **PT-P700** and **PT-P750W**
+(`filter/rastertoptp700`, `filter/rastertoptp750w`,
+`ppd/Brother_PT-P700.ppd`, `ppd/Brother_PT-P750W.ppd`) -- `install.sh` and
+the `.pkg` installer both install all three models' files.
+
+**Status: UNCONFIRMED on real hardware.** Everything below is from
+researching each model's published specs and third-party open-source
+driver source, not from a real print on a PT-P700 or PT-P750W:
+
+- Both share the PT-P710BT's supported tape widths (3.5/6/9/12/18/24mm),
+  128-pin print head, and 180dpi resolution, so `brother_ptraster/media.py`
+  applies unchanged.
+- **PT-P750W**: Brother documents its raster command protocol together
+  with the PT-P710BT's in one combined reference
+  ("PT-E550W/P750W/P710BT"), so the protocol itself (all the ESC-i
+  commands, compression, cutting, etc.) is high-confidence identical.
+- **PT-P700**: treated as a standard member of the same PT-series raster
+  family by third-party CUPS/Linux drivers, but not itself named in
+  Brother's own raster reference -- slightly less certain than PT-P750W,
+  though still a reasonable starting assumption.
+- Both are **USB only** for this project (PT-P700 has no Bluetooth/WiFi
+  at all; PT-P750W's WiFi isn't supported here -- would need a separate
+  network CUPS backend, not attempted).
+- What is genuinely NOT shared and needs its own hardware confirmation
+  per unit: `PIN_ALIGNMENT_TRIM_DOTS` (print head <-> tape centering,
+  see `media.py`) and the feed/leading margin (`DEFAULT_MARGIN_MM` in
+  each filter script) -- these are mechanical properties of one specific
+  physical printer, not something the shared protocol determines.
+  `filter/rastertoptp700` and `filter/rastertoptp750w` currently start
+  from the PT-P710BT's confirmed values as a guess.
+
+**To validate one of these on real hardware**, repeat the same
+incremental process used for the PT-P710BT (see "Testing against real
+hardware" above), using `--pin-alignment-trim-dots` and
+`--feed-margin-mm`/`--leading-margin-mm` on `tools/test_print.py` to
+re-tune those two values for your specific unit, then update the
+corresponding constants in `filter/rastertoptp700` or
+`filter/rastertoptp750w` once confirmed. If the protocol itself turns out
+to need adjustment too (rather than just these two tuning values), that
+logic lives in `brother_ptraster/filter_core.py`, shared by all three
+filters -- a fix there should be made model-conditional if it turns out
+not to apply to the PT-P710BT as well.
+
 ## Known limitations
 
 - **Bluetooth confirmed non-functional on at least one unit.** macOS
@@ -501,9 +546,14 @@ brother_ptraster/       Protocol library (no CUPS/macOS dependency; unit-testabl
   status.py                Decoder for the printer's 32-byte status packet
   usb_transport.py         Direct (bidirectional) USB transport, for status queries only
   patterns.py              Test patterns (ruler/diagonal/etc.) for hardware bring-up
-filter/rastertoptp710bt   CUPS filter entrypoint
-backend/ptp710bt          CUPS backend entrypoint (Bluetooth SPP transport, experimental)
+  filter_core.py           Shared CUPS filter logic for all three models (see filter/)
+filter/rastertoptp710bt   CUPS filter entrypoint (PT-P710BT; hardware-confirmed tuning)
+filter/rastertoptp700     CUPS filter entrypoint (PT-P700; UNCONFIRMED on hardware)
+filter/rastertoptp750w    CUPS filter entrypoint (PT-P750W; UNCONFIRMED on hardware)
+backend/ptp710bt          CUPS backend entrypoint (Bluetooth SPP transport, PT-P710BT only, experimental)
 ppd/Brother_PT-P710BT.ppd PPD describing the printer to CUPS/macOS
+ppd/Brother_PT-P700.ppd   Same, for the PT-P700 (UNCONFIRMED on hardware)
+ppd/Brother_PT-P750W.ppd  Same, for the PT-P750W (UNCONFIRMED on hardware)
 install/                  install.sh / uninstall.sh
   pkg/build_pkg.sh         Builds a double-click .pkg installer (run once, on macOS)
 tools/list_bt_serial_ports.py  Helper to find the paired Bluetooth device's /dev/cu.* name

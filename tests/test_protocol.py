@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from brother_ptraster.media import get_media, nearest_media, HEAD_PINS, BYTES_PER_LINE, PIN_ALIGNMENT_TRIM_DOTS
+from brother_ptraster.media import get_media, nearest_media, build_media_table, HEAD_PINS, BYTES_PER_LINE, PIN_ALIGNMENT_TRIM_DOTS
 from brother_ptraster.protocol import RasterJobBuilder, build_status_request, pack_bitmap_row, ESC
 
 
@@ -32,6 +32,22 @@ def test_24mm_uses_full_head():
     assert media.print_dots == HEAD_PINS
     assert media.pin_offset == 0
     assert media.print_bytes == BYTES_PER_LINE
+
+
+def test_build_media_table_with_a_different_trim_only_moves_pin_offset():
+    # Other models (PT-P700/PT-P750W) need their own trim once hardware-
+    # tuned; everything else about the table (widths, print_dots) must
+    # stay identical, since the physical spec (128-pin head, 180dpi,
+    # supported tape widths) is shared across the whole family.
+    default_table = build_media_table()
+    other_table = build_media_table(pin_alignment_trim_dots=0)
+    for name in default_table:
+        default_media = default_table[name]
+        other_media = other_table[name]
+        assert other_media.print_dots == default_media.print_dots
+        assert other_media.width_mm == default_media.width_mm
+        max_offset = HEAD_PINS - default_media.print_dots
+        assert other_media.pin_offset == max_offset // 2  # trim=0 -> plain centering
 
 
 def test_ppd_option_matches_the_ppds_pagesize_choice_names():
